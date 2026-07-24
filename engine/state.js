@@ -77,6 +77,8 @@ function addFactoid(state, f) {
   const text = String(f.text || "").trim();
   if (!text) return null;
   if (!plausibleCategory(f.category, text + " " + (f.verbatim || ""))) f = { ...f, category: "specific" };
+  // Sacred phrases are short by nature. A filed paragraph is material, not scripture.
+  if (f.category === "sacred" && text.split(/\s+/).length > 12) f = { ...f, category: "emotion" };
   if (Array.isArray(f.flags) && f.flags.includes("wound") && !plausibleWound(text + " " + (f.verbatim || ""))) {
     f = { ...f, flags: f.flags.filter((x) => x !== "wound") };
   }

@@ -51,6 +51,8 @@ class StoryState {
         if (t.isEmpty()) return null
         var cat0 = category
         if (!plausibleCategory(cat0, "$t $verbatim")) cat0 = "specific"
+        // Sacred phrases are short by nature — a filed paragraph is material, not scripture.
+        if (cat0 == "sacred" && t.split(Regex("\\s+")).size > 12) cat0 = "emotion"
         val cat = if (CATEGORIES.containsKey(cat0)) cat0 else "specific"
         val cleanFlags = if ("wound" in flags && !plausibleWound("$t $verbatim")) flags.filter { it != "wound" } else flags
         for (g in factoids) {

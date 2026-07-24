@@ -2,7 +2,9 @@
 // The judge's question: does question N ask for information the customer already provided?
 "use strict";
 
-const { chatJson } = require("../engine/llm");
+// No forced JSON format: thinking judges go degenerate under format=json.
+// Let the model reason, then parse the JSON out of its reply.
+const { chat, readJson } = require("../engine/llm");
 
 const JUDGE_SYS = `You are auditing an interview for one specific failure: asking the customer for information they ALREADY provided.
 
@@ -22,10 +24,11 @@ Output ONLY JSON: {"reask": boolean, "evidence": string, "reasoning": string}`;
 
 async function judgeQuestion(judgeModel, priorTranscript, candidateQuestion) {
   const convo = priorTranscript.map((t) => `Q${t.turn}: ${t.q}\nA${t.turn}: ${t.a}`).join("\n\n");
-  const parsed = await chatJson(judgeModel, [
+  const raw = await chat(judgeModel, [
     { role: "system", content: JUDGE_SYS },
     { role: "user", content: `INTERVIEW SO FAR:\n${convo}\n\nCANDIDATE (the next question that was asked):\n${candidateQuestion}` },
   ], { temperature: 0.1, num_ctx: 16384 });
+  const parsed = readJson(raw);
   if (!parsed) return { reask: null, evidence: "", reasoning: "judge failed to answer" };
   return { reask: !!parsed.reask, evidence: parsed.evidence || "", reasoning: parsed.reasoning || "" };
 }

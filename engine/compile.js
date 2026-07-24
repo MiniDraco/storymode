@@ -20,7 +20,11 @@ function renderHandoff(state, template) {
   const ident = S.byCategory(state, "identity").map((f) => f.text);
   const job = S.byCategory(state, "job").map((f) => f.text);
   const sound = S.byCategory(state, "sound").map((f) => f.text);
-  const sacred = S.byCategory(state, "sacred").map((f) => `"${f.verbatim || f.text}"`);
+  // Defense in depth: only short phrases render as sacred, whatever the state holds.
+  const sacred = S.byCategory(state, "sacred")
+    .map((f) => f.verbatim || f.text)
+    .filter((t) => t.split(/\s+/).length <= 12)
+    .map((t) => `"${t}"`);
   const bounds = S.byCategory(state, "boundary").map((f) => f.text);
   const phonetic = state.factoids.filter((f) => f.flags.includes("phonetic")).map((f) => f.text);
 

@@ -29,8 +29,8 @@ async function main() {
   const checks = [];
   const lyricsLower = song.toLowerCase();
 
-  // Sacred words verbatim
-  const sacred = state.factoids.filter((f) => f.category === "sacred");
+  // Sacred words verbatim — same short-phrase floor the compiler applies.
+  const sacred = state.factoids.filter((f) => f.category === "sacred" && (f.verbatim || f.text).split(/\s+/).length <= 12);
   for (const s of sacred) {
     const phrase = (s.verbatim || s.text).replace(/^"|"$/g, "");
     const ok = lyricsLower.includes(phrase.toLowerCase());
@@ -57,15 +57,24 @@ async function main() {
   const hits = BANNED.filter((w) => new RegExp(`\\b${w.replace(/ /g, "\\s+")}\\b`).test(lyricsBlock));
   checks.push({ name: `cliché screen (${hits.length ? "hits: " + hits.join(", ") : "clean"})`, ok: hits.length === 0 });
 
-  // Specificity: top-3 heat factoids should leave fingerprints in the lyrics
+  // Specificity: the top factoids must be RECOGNIZABLY in the lyrics — judged by a model,
+  // not keyword overlap (comprehension is checked by something that comprehends).
+  // No forced JSON format: the thinking judge goes degenerate under format=json;
+  // let it reason, then parse the JSON out of its reply.
+  const { chat, readJson } = require("../engine/llm");
+  const JUDGE_SYS = `You check whether a FACT about a person is recognizably reflected in SONG LYRICS. Lyrics compress and reword: present=true if the fact's most distinctive detail or image appears in ANY wording, even partially. present=false only if nothing in the lyrics points to this fact. Reply with ONLY a JSON object: {"present": boolean, "line": string}.`;
   const top = S.sortedFactoids(state).filter((f) => ["specific", "scene"].includes(f.category)).slice(0, 5);
   let grounded = 0;
+  const lyricsBlock1 = song.split(/BLOCK 2/i)[0] || song;
   for (const f of top) {
-    const kws = S.tokens(f.text).filter((w) => w.length > 3);
-    const hit = kws.filter((w) => lyricsLower.includes(w)).length;
-    if (kws.length && hit / kws.length >= 0.3) grounded++;
+    const raw = await chat(model, [
+      { role: "system", content: JUDGE_SYS },
+      { role: "user", content: `FACT: ${f.text}\n\nLYRICS:\n${lyricsBlock1}` },
+    ], { temperature: 0.1, num_ctx: 8192 });
+    const v = readJson(raw);
+    if (v && v.present === true) grounded++;
   }
-  checks.push({ name: `top specifics present in lyrics (${grounded}/${top.length})`, ok: grounded >= Math.min(3, top.length) });
+  checks.push({ name: `top specifics present in lyrics (${grounded}/${top.length})`, ok: grounded >= Math.min(4, top.length) });
 
   const pass = checks.every((c) => c.ok);
   const out = runFile.replace(/\.json$/, "_stranger.md");

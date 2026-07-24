@@ -11,7 +11,10 @@ object Compile {
         val ident = state.byCategory("identity").map { it.text }
         val job = state.byCategory("job").map { it.text }
         val sound = state.byCategory("sound").map { it.text }
-        val sacred = state.byCategory("sacred").map { "\"${it.verbatim.ifBlank { it.text }}\"" }
+        val sacred = state.byCategory("sacred")
+            .map { it.verbatim.ifBlank { it.text } }
+            .filter { it.split(Regex("\\s+")).size <= 12 }
+            .map { "\"$it\"" }
         val bounds = state.byCategory("boundary").map { it.text }
         val phonetic = state.factoids.filter { "phonetic" in it.flags }.map { it.text }
 
