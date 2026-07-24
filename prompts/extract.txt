@@ -12,7 +12,7 @@ Rules:
    - "scene" — a story with a beginning/middle/end ("the time they..."), a specific remembered moment
    - "emotion" — a feeling the customer expresses or describes, including mixed/conflicted feelings
    - "job" — what the song is for: the occasion, who will hear it, when it plays
-   - "sound" — music direction: genre, artists, songs, energy, voice preference
+   - "sound" — music direction: genre, artists, songs, energy, voice preference. ANY musician, band, or song the subject loves belongs here (also file it as "specific" if it is a personal habit, e.g. "whistles Merle Haggard while working" = both)
    - "boundary" — anything that must NOT be in the song, or a surprise to protect
    - "sacred" — a phrase the customer clearly wants kept word-for-word
 4. "heat" = 1-5. How identity-bearing is this? 5 = could only be about this person (a wound, a love, a vivid particular, a thing almost no one else does). 1 = true of many people.

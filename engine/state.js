@@ -51,8 +51,11 @@ function addFactoid(state, f) {
   const text = String(f.text || "").trim();
   if (!text) return null;
   // Dedupe: same category + high token overlap = same fact. Keep the heavier one.
+  // Category-scoped on purpose — "whistles Merle Haggard" may legitimately live as
+  // both a specific (habit) and a sound (music direction).
+  const cat = CAT_KEYS.includes(f.category) ? f.category : "specific";
   for (const g of state.factoids) {
-    if (jaccard(g.text, text) >= 0.6) {
+    if (g.category === cat && jaccard(g.text, text) >= 0.6) {
       if ((f.weight || 0) > g.weight) { g.text = text; g.weight = f.weight; g.verbatim = f.verbatim || g.verbatim; }
       return g;
     }

@@ -34,7 +34,9 @@ async function runInterview(model, answerFn, log = () => {}) {
     for (const f of factoids) {
       const rec = S.addFactoid(state, f);
       if (rec && rec.flags.includes("name") && !state.name) {
-        state.name = rec.verbatim || rec.text.replace(/^name:\s*/i, "");
+        // A name is 1-3 words. Anything longer is a model misfire, not a name.
+        const cand = (rec.verbatim || rec.text.replace(/^name:\s*/i, "")).trim();
+        if (cand && cand.split(/\s+/).length <= 3 && cand.length <= 30) state.name = cand;
       }
     }
     log(`  extracted ${factoids.length} factoids; total ${state.factoids.length}; gaps: ${S.gaps(state).join(",") || "none"}`);
@@ -48,6 +50,13 @@ async function runInterview(model, answerFn, log = () => {}) {
     }
 
     const nq = await nextQuestion(model, state, answer);
+    if (nq.done) {
+      // Every remaining "gap" was already covered under another category — nothing left to ask.
+      state.done = true;
+      state.thin = S.gaps(state);
+      log(`STOP (all gaps covered) after ${state.turn} turns`);
+      break;
+    }
     question = nq.question;
     reflection = nq.reflection;
     if (nq.source === "fallback") log("  (fallback question used)");

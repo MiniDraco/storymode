@@ -82,16 +82,24 @@ function renderDossier(state, meta = {}) {
 }
 
 // The customer's finish paragraph — their own words mirrored back. Code-rendered, zero generation.
+// Screenshot-sized: short punchy quotes only, never paragraphs.
 function renderFinish(state) {
-  const top = S.sortedFactoids(state)
-    .filter((f) => ["specific", "scene", "emotion"].includes(f.category))
+  const who = state.name && state.name.length <= 30 ? state.name : "them";
+  const quotable = S.sortedFactoids(state)
+    .filter((f) => ["specific", "scene", "emotion", "sacred"].includes(f.category))
+    .map((f) => {
+      // Prefer the shorter of text/verbatim; a good mirror line is 3-20 words.
+      const cands = [f.verbatim, f.text].filter(Boolean).map((s) => s.trim())
+        .filter((s) => { const w = s.split(/\s+/).length; return w >= 3 && w <= 20; })
+        .sort((a, b) => a.length - b.length);
+      return cands[0] ? { q: cands[0], w: f.weight } : null;
+    })
+    .filter(Boolean)
     .slice(0, 4);
-  const who = state.name || "them";
-  if (!top.length) return `Your story is in. Everything you told me about ${who} goes straight to the person writing their song.`;
-  const bits = top.map((f) => f.verbatim || f.text);
+  if (!quotable.length) return `Your story is in. Everything you told me about ${who} goes straight to the person writing their song.`;
   return [
     `Here's what I'm carrying to the songwriter — in your words:`,
-    ...bits.map((b) => `“${b}”`),
+    ...quotable.map((b) => `“${b.q}”`),
     `That's ${who}. Nobody else. Your story is in — the song is next.`,
   ].join("\n");
 }
