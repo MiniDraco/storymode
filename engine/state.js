@@ -77,9 +77,15 @@ const WOUND_RE = /\b(died?|dying|death|passed( away)?|cancer|funeral|buried|grav
 function plausibleWound(text) { return WOUND_RE.test(text); }
 
 let _id = 0;
+// Internal digest notation ("- [specific] ...") must never survive into stored text —
+// models copying digest lines back at us is a known failure mode.
+function stripNotation(s) {
+  return String(s || "").replace(/^\s*(?:-\s*)?\[[a-z]+\]\s*/i, "").trim();
+}
 function addFactoid(state, f) {
-  const text = String(f.text || "").trim();
+  const text = stripNotation(f.text);
   if (!text) return null;
+  f = { ...f, text, verbatim: stripNotation(f.verbatim) };
   if (!plausibleCategory(f.category, text + " " + (f.verbatim || ""))) f = { ...f, category: "specific" };
   // Sacred phrases are short by nature. A filed paragraph is material, not scripture.
   if (f.category === "sacred" && text.split(/\s+/).length > 12) f = { ...f, category: "emotion" };

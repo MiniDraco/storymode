@@ -46,8 +46,11 @@ class StoryState {
     val fallbackCounts = mutableMapOf<String, Int>()
     private var nextId = 0
 
-    fun addFactoid(category: String, text: String, verbatim: String, weight: Double, flags: List<String>): Factoid? {
-        val t = text.trim()
+    private fun stripNotation(s: String) = s.replace(Regex("^\\s*(?:-\\s*)?\\[[a-z]+\\]\\s*", RegexOption.IGNORE_CASE), "").trim()
+
+    fun addFactoid(category: String, text: String, verbatim0: String, weight: Double, flags: List<String>): Factoid? {
+        val t = stripNotation(text)
+        val verbatim = stripNotation(verbatim0)
         if (t.isEmpty()) return null
         var cat0 = category
         if (!plausibleCategory(cat0, "$t $verbatim")) cat0 = "specific"
