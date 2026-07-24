@@ -35,12 +35,15 @@ function validateQuestion(q, state, kind) {
   for (const prev of state.asked) {
     if (S.jaccard(prev, q) >= 0.45) { problems.push("near-duplicate of an asked question"); break; }
   }
-  // Revisiting the same moment in new words: any shared 4-gram with a prior question.
-  const qt = S.tokens(q);
+  // Revisiting the same moment in new words: any shared 3-gram with a prior question,
+  // computed over stopword-stripped tokens so "the night"/"that night" can't dodge it.
+  const STOP = new Set(["the", "that", "this", "and", "with", "you", "your", "for", "was", "were", "did", "does"]);
+  const strip = (s) => S.tokens(s).filter((w) => !STOP.has(w));
+  const qt = strip(q);
   outer: for (const prev of state.asked) {
-    const pn = " " + S.tokens(prev).join(" ") + " ";
-    for (let i = 0; i + 3 < qt.length; i++) {
-      if (pn.includes(" " + qt.slice(i, i + 4).join(" ") + " ")) {
+    const pn = " " + strip(prev).join(" ") + " ";
+    for (let i = 0; i + 2 < qt.length; i++) {
+      if (pn.includes(" " + qt.slice(i, i + 3).join(" ") + " ")) {
         problems.push("revisits a moment already asked about — pick a different thread");
         break outer;
       }
@@ -81,7 +84,7 @@ async function gapAlreadyCovered(model, state, gapKey) {
   // Deterministic pre-pass: if a known factoid plainly matches the gap's pattern
   // (music-ish for sound, occasion-ish for job, relationship words for identity),
   // recategorize it — no model roulette.
-  if (["sound", "job", "identity"].includes(gapKey)) {
+  if (["sound", "job", "identity", "scene"].includes(gapKey)) {
     const hit = state.factoids.find((f) => f.category !== gapKey && S.coversGap(gapKey, f.text + " " + (f.verbatim || "")));
     if (hit) {
       S.addFactoid(state, { category: gapKey, text: hit.text, verbatim: hit.verbatim, weight: hit.weight, flags: ["recategorized"] });

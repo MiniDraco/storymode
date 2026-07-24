@@ -121,10 +121,12 @@ class StoryState {
             "job" -> JOB_RE.containsMatchIn(text)
             else -> true
         }
+        private val SCENE_RE = Regex("\\b(the (night|day|morning|afternoon|evening|summer|winter|spring|fall|year|time|moment) (of|when|she|he|we|i|before|after)|one (night|day|time|morning)|that (night|day|morning|time)|when (he|she|we|i|they) \\w+|there was (a|this|one)|i remember (the|when|that))\\b", RegexOption.IGNORE_CASE)
         fun coversGap(cat: String, text: String): Boolean = when (cat) {
             "sound" -> SOUND_RE.containsMatchIn(text)
             "job" -> JOB_RE.containsMatchIn(text)
             "identity" -> IDENTITY_RE.containsMatchIn(text)
+            "scene" -> SCENE_RE.containsMatchIn(text)
             else -> false
         }
 

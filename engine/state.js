@@ -60,10 +60,14 @@ function plausibleCategory(cat, text) {
   if (cat === "identity") return true; // identity is healed by IDENTITY_RE, never demoted
   return true;
 }
+// Scene-shaped language: a told moment with a when/what-happened spine.
+const SCENE_RE = /\b(the (night|day|morning|afternoon|evening|summer|winter|spring|fall|year|time|moment) (of|when|she|he|we|i|before|after)|one (night|day|time|morning)|that (night|day|morning|time)|when (he|she|we|i|they) \w+|there was (a|this|one)|i remember (the|when|that))\b/i;
+
 function coversGap(cat, text) {
   if (cat === "sound") return SOUND_RE.test(text);
   if (cat === "job") return JOB_RE.test(text);
   if (cat === "identity") return IDENTITY_RE.test(text);
+  if (cat === "scene") return SCENE_RE.test(text);
   return false;
 }
 

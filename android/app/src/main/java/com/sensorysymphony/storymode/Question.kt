@@ -33,13 +33,16 @@ object Question {
         if (state.turn >= 1 && GENERIC.containsMatchIn(q)) problems.add("generic 'what stood out' form — name a known detail and ask for something different")
         if (COMPOUND.containsMatchIn(q)) problems.add("compound question — one ask only")
         if (state.asked.any { jaccard(it, q) >= 0.45 }) problems.add("near-duplicate of an asked question")
-        // Revisiting the same moment in new words: any shared 4-gram with a prior question.
-        val qt = StoryState.tokens(q)
+        // Revisiting the same moment in new words: any shared 3-gram with a prior question,
+        // computed over stopword-stripped tokens so "the night"/"that night" can't dodge it.
+        val stop = setOf("the", "that", "this", "and", "with", "you", "your", "for", "was", "were", "did", "does")
+        fun strip(s: String) = StoryState.tokens(s).filter { it !in stop }
+        val qt = strip(q)
         run {
             for (prev in state.asked) {
-                val pn = " " + StoryState.tokens(prev).joinToString(" ") + " "
-                for (i in 0..qt.size - 4) {
-                    if (pn.contains(" " + qt.subList(i, i + 4).joinToString(" ") + " ")) {
+                val pn = " " + strip(prev).joinToString(" ") + " "
+                for (i in 0..qt.size - 3) {
+                    if (pn.contains(" " + qt.subList(i, i + 3).joinToString(" ") + " ")) {
                         problems.add("revisits a moment already asked about — pick a different thread")
                         return@run
                     }
@@ -73,7 +76,7 @@ object Question {
     private suspend fun gapAlreadyCovered(llm: LlmBridge, state: StoryState, gapKey: String): Boolean {
         // Deterministic pre-pass: a known factoid plainly matching the gap's pattern gets
         // recategorized directly — no model roulette.
-        if (gapKey in listOf("sound", "job", "identity")) {
+        if (gapKey in listOf("sound", "job", "identity", "scene")) {
             val hit = state.factoids.firstOrNull {
                 it.category != gapKey && StoryState.coversGap(gapKey, "${it.text} ${it.verbatim}")
             }
