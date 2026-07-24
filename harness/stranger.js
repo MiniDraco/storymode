@@ -9,7 +9,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { chat } = require("../engine/llm");
+const { chat, readJson } = require("../engine/llm");
 const { renderHandoff } = require("../engine/compile");
 const S = require("../engine/state");
 
@@ -61,9 +61,11 @@ async function main() {
   // not keyword overlap (comprehension is checked by something that comprehends).
   // No forced JSON format: the thinking judge goes degenerate under format=json;
   // let it reason, then parse the JSON out of its reply.
-  const { chat, readJson } = require("../engine/llm");
   const JUDGE_SYS = `You check whether a FACT about a person is recognizably reflected in SONG LYRICS. Lyrics compress and reword: present=true if the fact's most distinctive detail or image appears in ANY wording, even partially. present=false only if nothing in the lyrics points to this fact. Reply with ONLY a JSON object: {"present": boolean, "line": string}.`;
-  const top = S.sortedFactoids(state).filter((f) => ["specific", "scene"].includes(f.category)).slice(0, 5);
+  // Judge exactly the five facts the handoff's MUST APPEAR section demands.
+  const top = S.sortedFactoids(state)
+    .filter((f) => ["specific", "scene"].includes(f.category) && f.text.split(/\s+/).length >= 5)
+    .slice(0, 5);
   let grounded = 0;
   const lyricsBlock1 = song.split(/BLOCK 2/i)[0] || song;
   for (const f of top) {

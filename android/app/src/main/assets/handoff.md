@@ -6,6 +6,10 @@ You are a professional songwriter. Below is everything gathered from an intervie
 ## WHAT THE SONG IS FOR
 {{JOB}}
 
+## MUST APPEAR — non-negotiable
+Each of these five must appear recognizably in the lyrics. A listener who knows the subject should catch every one. Check the finished lyrics against this list before you answer.
+{{MUSTAPPEAR}}
+
 ## THE MATERIAL — most identity-bearing first
 Use these. The top of this list is the heart of the song. Every item is in the customer's own words.
 {{FACTOIDS}}
@@ -31,7 +35,7 @@ Use these. The top of this list is the heart of the song. Every item is in the c
 
 Return exactly three blocks:
 
-**BLOCK 1 — LYRICS.** Full song lyrics with bracketed section tags: [Intro] [Verse 1] [Pre-Chorus] [Chorus] [Verse 2] [Bridge] [Outro] (use the sections the song needs). Ground every line in the material above — no invented facts. The top five numbered items in THE MATERIAL are non-negotiable: each must appear recognizably in the lyrics — an ordinary listener who knows the subject should catch every one. Any name flagged with a phonetic spelling must appear IN the lyrics spelled phonetically (e.g. write "Shi-VAWN" not "Siobhan") — Suno sings what it reads and pronunciation cannot be fixed after generation. Avoid these words and constructions entirely: neon, shadows, whisper, echoes, silhouette, embers, stardust, demons, veins, skyline, gravity, wildfire, "rise from the ashes", "broken pieces", "against all odds", "fire and ice", and any greeting-card sentiment. Concrete beats abstract; their words beat your words.
+**BLOCK 1 — LYRICS.** Full song lyrics with bracketed section tags: [Intro] [Verse 1] [Pre-Chorus] [Chorus] [Verse 2] [Bridge] [Outro] (use the sections the song needs). Ground every line in the material above — no invented facts. Every item in MUST APPEAR must be present, recognizably, in the lyrics — verify against that list before returning your answer. Any name flagged with a phonetic spelling must appear IN the lyrics spelled phonetically (e.g. write "Shi-VAWN" not "Siobhan") — Suno sings what it reads and pronunciation cannot be fixed after generation. Avoid these words and constructions entirely: neon, shadows, whisper, echoes, silhouette, embers, stardust, demons, veins, skyline, gravity, wildfire, "rise from the ashes", "broken pieces", "against all odds", "fire and ice", and any greeting-card sentiment. Concrete beats abstract; their words beat your words.
 
 **BLOCK 2 — SUNO STYLE FIELD.** One paragraph, UNDER 900 characters, containing 8–15 comma-separated tags total: 1–2 genre tags, 2–3 instrument tags (never more), 1–2 mood/energy tags, plus production descriptors and a BPM. Put the most important descriptors in the first 30 words. Nothing else in this block.
 

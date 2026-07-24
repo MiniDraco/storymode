@@ -33,6 +33,14 @@ function renderHandoff(state, template) {
     .map((f, i) => `${i + 1}. [${f.category}, heat ${f.weight}] ${f.text}${f.flags.includes("wound") ? "  (a wound — customer consented; hold it with care)" : ""}`)
     .join("\n");
 
+  // The five facts the song cannot skip: highest-ranked story material with a real
+  // image in it (fragments carry nothing to ground a lyric on).
+  const mustAppear = sorted
+    .filter((f) => ["specific", "scene"].includes(f.category) && f.text.split(/\s+/).length >= 5)
+    .slice(0, 5)
+    .map((f, i) => `${i + 1}. ${f.text}`)
+    .join("\n");
+
   const cov = S.coverage(state);
   const thin = Object.entries(cov)
     .filter(([k, v]) => v.need > 0 && v.have < v.need)
@@ -46,6 +54,7 @@ function renderHandoff(state, template) {
     .replace("{{IDENTITY}}", section(ident.concat(phonetic), "not fully established — see transcript"))
     .replace("{{JOB}}", section(job, "not stated — a warm, giftable tone is safe"))
     .replace("{{FACTOIDS}}", material || "- (thin — see transcript)")
+    .replace("{{MUSTAPPEAR}}", mustAppear || "- (thin — ground in whatever the transcript offers)")
     .replace("{{SACRED}}", section(sacred, "none given"))
     .replace("{{BOUNDARIES}}", section(bounds, "none given"))
     .replace("{{SOUND}}", section(sound, "not stated — choose to fit the emotional center"))

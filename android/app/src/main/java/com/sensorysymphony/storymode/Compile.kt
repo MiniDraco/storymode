@@ -22,6 +22,12 @@ object Compile {
             .mapIndexed { i, f -> "${i + 1}. [${f.category}, heat ${f.weight}] ${f.text}${if ("wound" in f.flags) "  (a wound — customer consented; hold it with care)" else ""}" }
             .joinToString("\n")
 
+        val mustAppear = sorted
+            .filter { it.category in listOf("specific", "scene") && it.text.split(Regex("\\s+")).size >= 5 }
+            .take(5)
+            .mapIndexed { i, f -> "${i + 1}. ${f.text}" }
+            .joinToString("\n")
+
         val thin = state.coverage().entries
             .filter { it.value.second > 0 && it.value.first < it.value.second }
             .map { "${CATEGORIES[it.key]?.label}: THIN — the customer gave little here. Do not invent depth to fill it." }
@@ -32,6 +38,7 @@ object Compile {
             .replace("{{IDENTITY}}", section(ident + phonetic, "not fully established — see transcript"))
             .replace("{{JOB}}", section(job, "not stated — a warm, giftable tone is safe"))
             .replace("{{FACTOIDS}}", material.ifEmpty { "- (thin — see transcript)" })
+            .replace("{{MUSTAPPEAR}}", mustAppear.ifEmpty { "- (thin — ground in whatever the transcript offers)" })
             .replace("{{SACRED}}", section(sacred, "none given"))
             .replace("{{BOUNDARIES}}", section(bounds, "none given"))
             .replace("{{SOUND}}", section(sound, "not stated — choose to fit the emotional center"))
