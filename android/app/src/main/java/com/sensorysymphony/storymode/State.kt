@@ -42,6 +42,7 @@ class StoryState {
     var done = false
     var thin = listOf<String>()
     var woundConsentAsked = false
+    val fallbackCounts = mutableMapOf<String, Int>()
     private var nextId = 0
 
     fun addFactoid(category: String, text: String, verbatim: String, weight: Double, flags: List<String>): Factoid? {

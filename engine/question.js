@@ -13,7 +13,9 @@ const YESNO = /^(do|does|did|is|are|was|were|have|has|had|can|could|would|will|s
 
 const META = /\b(comes? to (your )?mind|first (thing|came)|describe them|thought about|tell me about them)\b/i;
 // Generic elicitation forms are re-asks the moment the customer has said anything.
-const GENERIC = /\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them))\b/i;
+const GENERIC = /\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them)|stay(ed|s)? with you( the)? most|most represents?|best (shows|describes|captures)|captures who (he|she|they)|you think most)\b/i;
+// Compound questions smuggle a second ask behind "and".
+const COMPOUND = /\band (why|what|how|when|where|who)\b/i;
 
 function validateQuestion(q, state, kind) {
   const problems = [];
@@ -28,6 +30,7 @@ function validateQuestion(q, state, kind) {
   if (q.split(/\s+/).length > 38) problems.push("too long");
   if (state.turn >= 1 && META.test(q)) problems.push("meta-question / restatement of the opening");
   if (state.turn >= 1 && GENERIC.test(q)) problems.push("generic 'what stood out' form — name a known detail and ask for something different");
+  if (COMPOUND.test(q)) problems.push("compound question — one ask only");
   // Near-duplicate of an already-asked question?
   for (const prev of state.asked) {
     if (S.jaccard(prev, q) >= 0.45) problems.push("near-duplicate of an asked question");
@@ -186,17 +189,40 @@ function notAsked(state, q) {
   return q && state.asked.every((prev) => S.jaccard(prev, q) < 0.45);
 }
 
+// Anchor dedupe compares the ANCHOR, not the whole question — a shared template
+// must not block rotation onto new anchors.
+function anchorUnused(state, anchorText) {
+  const a = S.norm(anchorText).slice(0, 40);
+  return a && state.asked.every((prev) => !S.norm(prev).includes(a));
+}
+
 function fallbackFor(state, cat) {
   const short = (t) => t.replace(/[.!?]+$/, "").length > 60 ? t.replace(/[.!?]+$/, "").slice(0, 57) + "…" : t.replace(/[.!?]+$/, "");
+  state.fallbackCounts = state.fallbackCounts || {};
   if (ANCHOR_ASKS[cat]) {
+    // At most 2 anchored fallbacks per story-material category — then move on.
+    // Hammering one gap the extractor keeps missing is worse than an honest THIN flag.
+    if ((state.fallbackCounts[cat] || 0) >= 2) return null;
     const anchorCats = cat === "scene" ? ["scene", "specific"] : [cat === "specific" ? "specific" : cat, "specific"];
     const anchors = [...state.factoids]
       .filter((f) => anchorCats.includes(f.category) && f.text.split(/\s+/).length <= 14)
       .sort((a, b) => b.turn - a.turn || b.weight - a.weight);
     for (const a of anchors) {
+      if (!anchorUnused(state, short(a.text))) continue;
       const q = ANCHOR_ASKS[cat](short(a.text));
-      if (notAsked(state, q)) return q;
+      state.fallbackCounts[cat] = (state.fallbackCounts[cat] || 0) + 1;
+      return q;
     }
+    // Anchors exist but are all spent → do NOT fall to the generic form; it would
+    // ask for what the anchors already prove was given. Move to another gap.
+    if (anchors.length) return null;
+    // Nothing known in this territory at all → the generic form cannot be a re-ask.
+    const generic = FALLBACKS[cat];
+    if (generic && notAsked(state, generic) && state.factoids.filter((f) => f.category === cat).length === 0) {
+      state.fallbackCounts[cat] = (state.fallbackCounts[cat] || 0) + 1;
+      return generic;
+    }
+    return null;
   }
   const generic = FALLBACKS[cat];
   if (generic && notAsked(state, generic)) return generic;

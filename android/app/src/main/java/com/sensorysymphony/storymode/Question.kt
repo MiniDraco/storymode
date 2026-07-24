@@ -5,7 +5,8 @@ object Question {
 
     private val YESNO = Regex("^(do|does|did|is|are|was|were|have|has|had|can|could|would|will|should)\\b", RegexOption.IGNORE_CASE)
     private val META = Regex("\\b(comes? to (your )?mind|first (thing|came)|describe them|thought about|tell me about them)\\b", RegexOption.IGNORE_CASE)
-    private val GENERIC = Regex("\\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them))\\b", RegexOption.IGNORE_CASE)
+    private val GENERIC = Regex("\\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them)|stay(ed|s)? with you( the)? most|most represents?|best (shows|describes|captures)|captures who (he|she|they)|you think most)\\b", RegexOption.IGNORE_CASE)
+    private val COMPOUND = Regex("\\band (why|what|how|when|where|who)\\b", RegexOption.IGNORE_CASE)
 
     val FALLBACKS = mapOf(
         "identity" to "Who is this song for — what's their name, and who are they to you?",
@@ -30,6 +31,7 @@ object Question {
         if (q.split(Regex("\\s+")).size > 38) problems.add("too long")
         if (state.turn >= 1 && META.containsMatchIn(q)) problems.add("meta-question / restatement of the opening")
         if (state.turn >= 1 && GENERIC.containsMatchIn(q)) problems.add("generic 'what stood out' form — name a known detail and ask for something different")
+        if (COMPOUND.containsMatchIn(q)) problems.add("compound question — one ask only")
         for (prev in state.asked) if (jaccard(prev, q) >= 0.45) problems.add("near-duplicate of an asked question")
         return problems
     }
@@ -167,20 +169,38 @@ object Question {
 
     private fun notAsked(state: StoryState, q: String) = state.asked.all { jaccard(it, q) < 0.45 }
 
+    // Anchor dedupe compares the ANCHOR, not the whole question — a shared template
+    // must not block rotation onto new anchors.
+    private fun anchorUnused(state: StoryState, anchorText: String): Boolean {
+        val a = StoryState.norm(anchorText).take(40)
+        return a.isNotEmpty() && state.asked.all { !StoryState.norm(it).contains(a) }
+    }
+
     fun fallbackFor(state: StoryState, cat: String): String? {
         fun short(t: String): String {
             val s = t.trimEnd('.', '!', '?')
             return if (s.length > 60) s.take(57) + "…" else s
         }
         ANCHOR_ASKS[cat]?.let { ask ->
+            // At most 2 anchored fallbacks per story-material category — then move on.
+            if ((state.fallbackCounts[cat] ?: 0) >= 2) return null
             val anchorCats = if (cat == "scene") listOf("scene", "specific") else listOf(cat, "specific").distinct()
             val anchors = state.factoids
                 .filter { it.category in anchorCats && it.text.split(Regex("\\s+")).size <= 14 }
                 .sortedWith(compareByDescending<Factoid> { it.turn }.thenByDescending { it.weight })
             for (a in anchors) {
-                val q = ask(short(a.text))
-                if (notAsked(state, q)) return q
+                if (!anchorUnused(state, short(a.text))) continue
+                state.fallbackCounts[cat] = (state.fallbackCounts[cat] ?: 0) + 1
+                return ask(short(a.text))
             }
+            // Anchors exist but are spent → never fall to the generic form; move to another gap.
+            if (anchors.isNotEmpty()) return null
+            val generic = FALLBACKS[cat]
+            if (generic != null && notAsked(state, generic) && state.byCategory(cat).isEmpty()) {
+                state.fallbackCounts[cat] = (state.fallbackCounts[cat] ?: 0) + 1
+                return generic
+            }
+            return null
         }
         val generic = FALLBACKS[cat]
         if (generic != null && notAsked(state, generic)) return generic
