@@ -49,12 +49,22 @@ function jaccard(a, b) {
 // Plausibility floors for the load-bearing slots. A small model sometimes sprays
 // categories; junk in sound/job silently "completes" the slot and kills the question
 // that should have been asked. Demotion (not deletion) keeps the text and the question.
-const SOUND_RE = /\b(music|song|songs|sing|singer|singing|sings|band|artist|album|genre|country|rock|folk|jazz|blues|rap|hip.?hop|r&b|soul|gospel|pop|acoustic|guitar|piano|fiddle|drums?|melody|radio|playlist|record|vinyl|hums?|humming|whistl\w*|voice|vocal|tempo|upbeat|ballad|anthem|lullaby|[A-Z]\w+ (Mac|Haggard|Cash|Strait|Nicks|Seger))\b/i;
+const SOUND_RE = /\b(music|song|songs|sing|singer|singing|sings|band|artist|album|genre|country|rock|folk|jazz|blues|rap|hip.?hop|r&b|soul|gospel|pop|acoustic|guitar|piano|fiddle|drums?|melody|radio|playlist|record|vinyl|hums?|humming|whistl\w*|voice|vocal|tempo|upbeat|ballad|anthem|lullaby|hits|tunes?|tracks?|jams?|blast(s|ing|ed)?|listen\w*|[A-Z]\w+ (Mac|Haggard|Cash|Strait|Nicks|Seger))\b/i;
 const JOB_RE = /\b(birthday|wedding|anniversar\w*|memorial|funeral|retirement|graduation|proposal|christmas|reunion|party|celebration|reception|dinner|gathering|ceremony|surprise|occasion|plays? (at|for)|played at|hall|church|toast|slideshow|septemb\w*|octob\w*|novemb\w*|decemb\w*|januar\w*|februar\w*|march|april|may|june|july|august)\b/i;
+// Relationship words prove identity coverage even when the extractor filed them elsewhere.
+const IDENTITY_RE = /\b(my (wife|husband|dad|father|mom|mother|son|daughter|brother|sister|best friend|friend|grandma|grandmother|grandpa|grandfather|aunt|uncle|cousin|partner|fianc\w*|boyfriend|girlfriend|boss|mentor|neighbor|coworker)|wife of \d+|husband of \d+|(he|she)('s| is) my \w+)\b/i;
+
 function plausibleCategory(cat, text) {
   if (cat === "sound") return SOUND_RE.test(text);
   if (cat === "job") return JOB_RE.test(text);
+  if (cat === "identity") return true; // identity is healed by IDENTITY_RE, never demoted
   return true;
+}
+function coversGap(cat, text) {
+  if (cat === "sound") return SOUND_RE.test(text);
+  if (cat === "job") return JOB_RE.test(text);
+  if (cat === "identity") return IDENTITY_RE.test(text);
+  return false;
 }
 
 // A "wound" needs actual pain in it — small models spray the flag onto warmth,
@@ -148,5 +158,5 @@ module.exports = {
   CATEGORIES, CAT_KEYS, GAP_PRIORITY, HARD_CEILING,
   createState, addFactoid, byCategory, coverage, gaps, readiness,
   sortedFactoids, knownDigest, heatFrom, jaccard, norm, tokens,
-  plausibleCategory, plausibleWound,
+  plausibleCategory, plausibleWound, coversGap,
 };

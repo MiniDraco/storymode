@@ -32,7 +32,20 @@ object Question {
         if (state.turn >= 1 && META.containsMatchIn(q)) problems.add("meta-question / restatement of the opening")
         if (state.turn >= 1 && GENERIC.containsMatchIn(q)) problems.add("generic 'what stood out' form — name a known detail and ask for something different")
         if (COMPOUND.containsMatchIn(q)) problems.add("compound question — one ask only")
-        for (prev in state.asked) if (jaccard(prev, q) >= 0.45) problems.add("near-duplicate of an asked question")
+        if (state.asked.any { jaccard(it, q) >= 0.45 }) problems.add("near-duplicate of an asked question")
+        // Revisiting the same moment in new words: any shared 4-gram with a prior question.
+        val qt = StoryState.tokens(q)
+        run {
+            for (prev in state.asked) {
+                val pn = " " + StoryState.tokens(prev).joinToString(" ") + " "
+                for (i in 0..qt.size - 4) {
+                    if (pn.contains(" " + qt.subList(i, i + 4).joinToString(" ") + " ")) {
+                        problems.add("revisits a moment already asked about — pick a different thread")
+                        return@run
+                    }
+                }
+            }
+        }
         return problems
     }
 
@@ -51,16 +64,17 @@ object Question {
         data class Consent(val wound: Factoid) : Target()
         data class Heat(val thread: Factoid, val target: String) : Target()
         data class Gap(val target: String) : Target()
+        object Name : Target()
         object Done : Target()
     }
 
     private suspend fun gapAlreadyCovered(llm: LlmBridge, state: StoryState, gapKey: String): Boolean {
         // Deterministic pre-pass: a known factoid plainly matching the gap's pattern gets
         // recategorized directly — no model roulette.
-        if (gapKey == "sound" || gapKey == "job") {
+        if (gapKey in listOf("sound", "job", "identity")) {
             val hit = state.factoids.firstOrNull {
                 it.category != gapKey && it.category in listOf("specific", "scene", "emotion") &&
-                    StoryState.plausibleCategory(gapKey, it.text)
+                    StoryState.coversGap(gapKey, "${it.text} ${it.verbatim}")
             }
             if (hit != null) {
                 state.addFactoid(gapKey, hit.text, hit.verbatim, hit.weight, listOf("recategorized"))
@@ -68,7 +82,7 @@ object Question {
             }
         }
         val parsed = llm.chatJson(listOf(
-            Msg("system", "You check whether a topic is already covered by known facts. Output ONLY JSON: {\"covered\": boolean, \"evidence\": string}. covered=true ONLY if the facts genuinely contain material about the topic; evidence = the fact text that covers it, copied exactly. When unsure, covered=false."),
+            Msg("system", "You check whether a topic is already covered by known facts. Output ONLY JSON: {\"covered\": boolean, \"evidence\": string}. covered=true ONLY if the facts genuinely contain material about the topic; evidence = the fact text that covers it, copied exactly. When unsure, covered=false.\nExample: TOPIC \"The sound (genre / reference artists / energy)\" with a fact \"loves TLC and SWV, classic hits at the reception\" → {\"covered\": true, \"evidence\": \"loves TLC and SWV, classic hits at the reception\"} — named artists or songs the subject loves DO cover the sound topic."),
             Msg("user", "TOPIC: ${CATEGORIES[gapKey]?.label}\n\nKNOWN FACTS:\n${state.knownDigest(120)}"),
         ), temperature = 0.1) ?: return false
         if (parsed.optBoolean("covered") && parsed.optString("evidence").isNotBlank()) {
@@ -85,6 +99,11 @@ object Question {
         if (wound != null && !state.woundConsentAsked) {
             state.woundConsentAsked = true
             return Target.Consent(wound)
+        }
+        // A song needs the name: if identity is covered but no name surfaced, ask exactly that, once.
+        if (state.name == null && !state.nameAsked && state.turn >= 1 && "identity" !in state.gaps()) {
+            state.nameAsked = true
+            return Target.Name
         }
         val g = state.gaps()
         val heat = state.heatFrom(state.turn)
@@ -129,6 +148,7 @@ object Question {
     suspend fun next(llm: LlmBridge, systemPrompt: String, state: StoryState, lastAnswer: String): Next {
         val target = pickTarget(llm, state)
         if (target is Target.Done) return Next(null, null, null, "covered", done = true)
+        if (target is Target.Name) return Next("What's their name — what do you call them?", null, "identity", "fixed")
         val ctx = buildContext(state, lastAnswer, target)
         val kind = when (target) { is Target.Consent -> "consent"; is Target.Heat -> "heat"; is Target.Gap -> "gap"; else -> null }
         var messages = mutableListOf(Msg("system", systemPrompt), Msg("user", ctx))

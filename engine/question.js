@@ -33,7 +33,18 @@ function validateQuestion(q, state, kind) {
   if (COMPOUND.test(q)) problems.push("compound question — one ask only");
   // Near-duplicate of an already-asked question?
   for (const prev of state.asked) {
-    if (S.jaccard(prev, q) >= 0.45) problems.push("near-duplicate of an asked question");
+    if (S.jaccard(prev, q) >= 0.45) { problems.push("near-duplicate of an asked question"); break; }
+  }
+  // Revisiting the same moment in new words: any shared 4-gram with a prior question.
+  const qt = S.tokens(q);
+  outer: for (const prev of state.asked) {
+    const pn = " " + S.tokens(prev).join(" ") + " ";
+    for (let i = 0; i + 3 < qt.length; i++) {
+      if (pn.includes(" " + qt.slice(i, i + 4).join(" ") + " ")) {
+        problems.push("revisits a moment already asked about — pick a different thread");
+        break outer;
+      }
+    }
   }
   return problems;
 }
@@ -68,16 +79,17 @@ const FALLBACKS = {
 // A covered gap gets a synthetic factoid so the coverage map heals itself.
 async function gapAlreadyCovered(model, state, gapKey) {
   // Deterministic pre-pass: if a known factoid plainly matches the gap's pattern
-  // (music-ish for sound, occasion-ish for job), recategorize it — no model roulette.
-  if (gapKey === "sound" || gapKey === "job") {
-    const hit = state.factoids.find((f) => f.category !== gapKey && S.plausibleCategory(gapKey, f.text) === true && ["specific", "scene", "emotion"].includes(f.category));
+  // (music-ish for sound, occasion-ish for job, relationship words for identity),
+  // recategorize it — no model roulette.
+  if (["sound", "job", "identity"].includes(gapKey)) {
+    const hit = state.factoids.find((f) => f.category !== gapKey && S.coversGap(gapKey, f.text + " " + (f.verbatim || "")) && ["specific", "scene", "emotion"].includes(f.category));
     if (hit) {
       S.addFactoid(state, { category: gapKey, text: hit.text, verbatim: hit.verbatim, weight: hit.weight, flags: ["recategorized"] });
       return true;
     }
   }
   const parsed = await chatJson(model, [
-    { role: "system", content: `You check whether a topic is already covered by known facts. Output ONLY JSON: {"covered": boolean, "evidence": string}. covered=true ONLY if the facts genuinely contain material about the topic; evidence = the fact text that covers it, copied exactly. When unsure, covered=false.` },
+    { role: "system", content: `You check whether a topic is already covered by known facts. Output ONLY JSON: {"covered": boolean, "evidence": string}. covered=true ONLY if the facts genuinely contain material about the topic; evidence = the fact text that covers it, copied exactly. When unsure, covered=false.\nExample: TOPIC "The sound (genre / reference artists / energy)" with a fact "loves TLC and SWV, classic hits at the reception" → {"covered": true, "evidence": "loves TLC and SWV, classic hits at the reception"} — named artists or songs the subject loves DO cover the sound topic.` },
     { role: "user", content: `TOPIC: ${S.CATEGORIES[gapKey].label}\n\nKNOWN FACTS:\n${S.knownDigest(state, 120)}` },
   ], { temperature: 0.1 });
   if (parsed && parsed.covered === true && typeof parsed.evidence === "string" && parsed.evidence.trim()) {
@@ -96,6 +108,12 @@ async function pickTarget(model, state) {
   if (wound && !state.woundConsentAsked) {
     state.woundConsentAsked = true;
     return { kind: "consent", wound };
+  }
+  // A song needs the name. If identity is covered but no name ever surfaced, ask for
+  // exactly that, once — a fixed question that cannot re-ask anything.
+  if (!state.name && !state.nameAsked && state.turn >= 1 && !S.gaps(state).includes("identity")) {
+    state.nameAsked = true;
+    return { kind: "name" };
   }
   // Follow the heat: a hot thread from the last answer that still serves an open gap.
   const g = S.gaps(state);
@@ -139,6 +157,9 @@ function buildContext(state, lastAnswer, target) {
 async function nextQuestion(model, state, lastAnswer) {
   const target = await pickTarget(model, state);
   if (target.kind === "done") return { question: null, reflection: null, target: null, source: "covered", done: true };
+  if (target.kind === "name") {
+    return { question: "What's their name — what do you call them?", reflection: null, target: "identity", source: "fixed" };
+  }
   const ctx = buildContext(state, lastAnswer, target);
   let messages = [
     { role: "system", content: PROMPT },

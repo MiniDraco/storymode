@@ -42,6 +42,7 @@ class StoryState {
     var done = false
     var thin = listOf<String>()
     var woundConsentAsked = false
+    var nameAsked = false
     val fallbackCounts = mutableMapOf<String, Int>()
     private var nextId = 0
 
@@ -110,12 +111,19 @@ class StoryState {
     companion object {
         // Plausibility floors for the load-bearing slots — junk in sound/job silently
         // "completes" the slot and kills the question that should have been asked.
-        private val SOUND_RE = Regex("\\b(music|song|songs|sing|singer|singing|sings|band|artist|album|genre|country|rock|folk|jazz|blues|rap|hip.?hop|r&b|soul|gospel|pop|acoustic|guitar|piano|fiddle|drums?|melody|radio|playlist|record|vinyl|hums?|humming|whistl\\w*|voice|vocal|tempo|upbeat|ballad|anthem|lullaby|[A-Z]\\w+ (Mac|Haggard|Cash|Strait|Nicks|Seger))\\b", RegexOption.IGNORE_CASE)
+        private val SOUND_RE = Regex("\\b(music|song|songs|sing|singer|singing|sings|band|artist|album|genre|country|rock|folk|jazz|blues|rap|hip.?hop|r&b|soul|gospel|pop|acoustic|guitar|piano|fiddle|drums?|melody|radio|playlist|record|vinyl|hums?|humming|whistl\\w*|voice|vocal|tempo|upbeat|ballad|anthem|lullaby|hits|tunes?|tracks?|jams?|blast(s|ing|ed)?|listen\\w*|[A-Z]\\w+ (Mac|Haggard|Cash|Strait|Nicks|Seger))\\b", RegexOption.IGNORE_CASE)
+        private val IDENTITY_RE = Regex("\\b(my (wife|husband|dad|father|mom|mother|son|daughter|brother|sister|best friend|friend|grandma|grandmother|grandpa|grandfather|aunt|uncle|cousin|partner|fianc\\w*|boyfriend|girlfriend|boss|mentor|neighbor|coworker)|wife of \\d+|husband of \\d+|(he|she)('s| is) my \\w+)\\b", RegexOption.IGNORE_CASE)
         private val JOB_RE = Regex("\\b(birthday|wedding|anniversar\\w*|memorial|funeral|retirement|graduation|proposal|christmas|reunion|party|celebration|reception|dinner|gathering|ceremony|surprise|occasion|plays? (at|for)|played at|hall|church|toast|slideshow|septemb\\w*|octob\\w*|novemb\\w*|decemb\\w*|januar\\w*|februar\\w*|march|april|may|june|july|august)\\b", RegexOption.IGNORE_CASE)
         fun plausibleCategory(cat: String, text: String): Boolean = when (cat) {
             "sound" -> SOUND_RE.containsMatchIn(text)
             "job" -> JOB_RE.containsMatchIn(text)
             else -> true
+        }
+        fun coversGap(cat: String, text: String): Boolean = when (cat) {
+            "sound" -> SOUND_RE.containsMatchIn(text)
+            "job" -> JOB_RE.containsMatchIn(text)
+            "identity" -> IDENTITY_RE.containsMatchIn(text)
+            else -> false
         }
 
         // A "wound" needs actual pain in it — a consent question aimed at warmth reads as a re-ask.
