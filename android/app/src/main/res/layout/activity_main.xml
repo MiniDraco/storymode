@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#15120D"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="22dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SENSORY SYMPHONY"
+            android:textColor="#CAA15F"
+            android:textSize="11sp"
+            android:letterSpacing="0.32"
+            android:fontFamily="monospace" />
+
+        <LinearLayout
+            android:id="@+id/interviewGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/reflection"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:textColor="#CAA15F"
+                android:textSize="17sp"
+                android:textStyle="italic"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/question"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:textColor="#EFE6D4"
+                android:textSize="22sp"
+                android:lineSpacingMultiplier="1.25" />
+
+            <EditText
+                android:id="@+id/answer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:background="#221C15"
+                android:gravity="top"
+                android:hint="Just talk — type or use the mic."
+                android:textColorHint="#7C7261"
+                android:inputType="textMultiLine|textCapSentences"
+                android:minLines="4"
+                android:padding="14dp"
+                android:textColor="#EFE6D4"
+                android:textSize="17sp" />
+
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="#7C7261"
+                android:textSize="14sp"
+                android:textStyle="italic" />
+
+            <ProgressBar
+                android:id="@+id/spinner"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
+
+            <Button
+                android:id="@+id/send"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:backgroundTint="#E8A33D"
+                android:text="That's my answer"
+                android:textColor="#20160A"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/finishGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="What I heard"
+                android:textColor="#E8A33D"
+                android:textSize="24sp" />
+
+            <TextView
+                android:id="@+id/finishText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:textColor="#EFE6D4"
+                android:textSize="18sp"
+                android:lineSpacingMultiplier="1.3" />
+
+            <Button
+                android:id="@+id/copyHandoff"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:backgroundTint="#E8A33D"
+                android:text="Copy songwriter prompt"
+                android:textColor="#20160A"
+                android:textStyle="bold" />
+
+            <Button
+                android:id="@+id/shareDossier"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#221C15"
+                android:text="Send full dossier"
+                android:textColor="#E8A33D" />
+
+            <Button
+                android:id="@+id/newInterview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:backgroundTint="#221C15"
+                android:text="Start a new story"
+                android:textColor="#B3A690" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>

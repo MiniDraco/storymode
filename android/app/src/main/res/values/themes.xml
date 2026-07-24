@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.StoryMode" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">#E8A33D</item>
+        <item name="colorPrimaryVariant">#CAA15F</item>
+        <item name="colorOnPrimary">#20160A</item>
+        <item name="android:statusBarColor">#15120D</item>
+        <item name="android:windowBackground">#15120D</item>
+    </style>
+</resources>

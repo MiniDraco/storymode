@@ -91,9 +91,13 @@ function gaps(state) {
 }
 
 // The interview may stop when every needed slot is earned, or must stop at the ceiling.
+// A surfaced wound without consent is NOT complete: whether the song holds the pain or
+// steers around it is a compositional fact the dossier requires.
 function readiness(state) {
   const g = gaps(state);
   if (state.turn >= HARD_CEILING) return { stop: true, reason: "ceiling", gaps: g };
+  const wound = state.factoids.find((f) => f.flags.includes("wound"));
+  if (g.length === 0 && wound && !state.woundConsentAsked) return { stop: false, reason: "consent", gaps: [] };
   if (g.length === 0) return { stop: true, reason: "complete", gaps: [] };
   return { stop: false, reason: "gaps", gaps: g };
 }

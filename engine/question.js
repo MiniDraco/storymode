@@ -13,13 +13,16 @@ const YESNO = /^(do|does|did|is|are|was|were|have|has|had|can|could|would|will|s
 
 const META = /\b(comes? to (your )?mind|first (thing|came)|describe them|thought about|tell me about them)\b/i;
 
-function validateQuestion(q, state) {
+function validateQuestion(q, state, kind) {
   const problems = [];
   if (!q || typeof q !== "string" || !q.trim()) { problems.push("empty"); return problems; }
   if (!q.includes("?")) problems.push("not a question");
   if ((q.match(/\?/g) || []).length > 1) problems.push("more than one question");
-  if (/^why\b/i.test(q.trim())) problems.push("why-question (use What/How)");
-  if (YESNO.test(q.trim())) problems.push("yes/no question");
+  // Consent is a decision question — "should the song hold this?" is legal there, and only there.
+  if (kind !== "consent") {
+    if (/^why\b/i.test(q.trim())) problems.push("why-question (use What/How)");
+    if (YESNO.test(q.trim())) problems.push("yes/no question");
+  }
   if (q.split(/\s+/).length > 38) problems.push("too long");
   if (state.turn >= 1 && META.test(q)) problems.push("meta-question / restatement of the opening");
   // Near-duplicate of an already-asked question?
@@ -127,7 +130,7 @@ async function nextQuestion(model, state, lastAnswer) {
   for (let attempt = 0; attempt < 2; attempt++) {
     const parsed = await chatJson(model, messages, { temperature: 0.5 });
     if (parsed && typeof parsed.question === "string") {
-      const problems = validateQuestion(parsed.question, state);
+      const problems = validateQuestion(parsed.question, state, target.kind);
       if (!problems.length) {
         let reflection = typeof parsed.reflection === "string" ? parsed.reflection.trim() : null;
         if (reflection && !reflectionGrounded(reflection, lastAnswer)) reflection = null;
@@ -141,6 +144,10 @@ async function nextQuestion(model, state, lastAnswer) {
     }
   }
   // Model failed twice — deterministic fallback keeps the interview alive.
+  if (target.kind === "consent") {
+    const w = target.wound.text.length > 80 ? target.wound.text.slice(0, 77) + "…" : target.wound.text;
+    return { question: `You touched on something tender — "${w}". Would you like the song to hold that part of the story, or steer around it?`, reflection: null, target: "consent", source: "fallback" };
+  }
   const cat = target.target || "specific";
   return { question: FALLBACKS[cat] || FALLBACKS.specific, reflection: null, target: cat, source: "fallback" };
 }
