@@ -5,6 +5,7 @@ object Question {
 
     private val YESNO = Regex("^(do|does|did|is|are|was|were|have|has|had|can|could|would|will|should)\\b", RegexOption.IGNORE_CASE)
     private val META = Regex("\\b(comes? to (your )?mind|first (thing|came)|describe them|thought about|tell me about them)\\b", RegexOption.IGNORE_CASE)
+    private val GENERIC = Regex("\\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them))\\b", RegexOption.IGNORE_CASE)
 
     val FALLBACKS = mapOf(
         "identity" to "Who is this song for — what's their name, and who are they to you?",
@@ -28,6 +29,7 @@ object Question {
         }
         if (q.split(Regex("\\s+")).size > 38) problems.add("too long")
         if (state.turn >= 1 && META.containsMatchIn(q)) problems.add("meta-question / restatement of the opening")
+        if (state.turn >= 1 && GENERIC.containsMatchIn(q)) problems.add("generic 'what stood out' form — name a known detail and ask for something different")
         for (prev in state.asked) if (jaccard(prev, q) >= 0.45) problems.add("near-duplicate of an asked question")
         return problems
     }
@@ -51,11 +53,25 @@ object Question {
     }
 
     private suspend fun gapAlreadyCovered(llm: LlmBridge, state: StoryState, gapKey: String): Boolean {
+        // Deterministic pre-pass: a known factoid plainly matching the gap's pattern gets
+        // recategorized directly — no model roulette.
+        if (gapKey == "sound" || gapKey == "job") {
+            val hit = state.factoids.firstOrNull {
+                it.category != gapKey && it.category in listOf("specific", "scene", "emotion") &&
+                    StoryState.plausibleCategory(gapKey, it.text)
+            }
+            if (hit != null) {
+                state.addFactoid(gapKey, hit.text, hit.verbatim, hit.weight, listOf("recategorized"))
+                return true
+            }
+        }
         val parsed = llm.chatJson(listOf(
             Msg("system", "You check whether a topic is already covered by known facts. Output ONLY JSON: {\"covered\": boolean, \"evidence\": string}. covered=true ONLY if the facts genuinely contain material about the topic; evidence = the fact text that covers it, copied exactly. When unsure, covered=false."),
             Msg("user", "TOPIC: ${CATEGORIES[gapKey]?.label}\n\nKNOWN FACTS:\n${state.knownDigest(120)}"),
         ), temperature = 0.1) ?: return false
         if (parsed.optBoolean("covered") && parsed.optString("evidence").isNotBlank()) {
+            // The heal must clear the same plausibility floor as extraction — no junk coverage.
+            if (!StoryState.plausibleCategory(gapKey, parsed.optString("evidence"))) return false
             state.addFactoid(gapKey, parsed.optString("evidence").trim(), "", 3.0, listOf("recategorized"))
             return true
         }
@@ -134,6 +150,12 @@ object Question {
             return Next("You touched on something tender — \"$w\". Would you like the song to hold that part of the story, or steer around it?", null, "consent", "fallback")
         }
         val cat = when (target) { is Target.Gap -> target.target; is Target.Heat -> target.target; else -> "specific" }
+        if (cat == "specific") {
+            val known = state.sortedFactoids().firstOrNull { it.category == "specific" && it.text.split(Regex("\\s+")).size <= 12 }
+            if (known != null) {
+                return Next("Besides ${known.text.trimEnd('.', '!', '?')} — what's one more thing about them almost nobody else does?", null, cat, "fallback")
+            }
+        }
         return Next(FALLBACKS[cat] ?: FALLBACKS["specific"]!!, null, cat, "fallback")
     }
 }

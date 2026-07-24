@@ -12,6 +12,8 @@ const PROMPT = fs.readFileSync(path.join(__dirname, "..", "prompts", "question.t
 const YESNO = /^(do|does|did|is|are|was|were|have|has|had|can|could|would|will|should)\b/i;
 
 const META = /\b(comes? to (your )?mind|first (thing|came)|describe them|thought about|tell me about them)\b/i;
+// Generic elicitation forms are re-asks the moment the customer has said anything.
+const GENERIC = /\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them))\b/i;
 
 function validateQuestion(q, state, kind) {
   const problems = [];
@@ -25,6 +27,7 @@ function validateQuestion(q, state, kind) {
   }
   if (q.split(/\s+/).length > 38) problems.push("too long");
   if (state.turn >= 1 && META.test(q)) problems.push("meta-question / restatement of the opening");
+  if (state.turn >= 1 && GENERIC.test(q)) problems.push("generic 'what stood out' form — name a known detail and ask for something different");
   // Near-duplicate of an already-asked question?
   for (const prev of state.asked) {
     if (S.jaccard(prev, q) >= 0.45) problems.push("near-duplicate of an asked question");
@@ -61,11 +64,22 @@ const FALLBACKS = {
 // the wrong category. Miscategorized coverage is how a system re-asks what it was told.
 // A covered gap gets a synthetic factoid so the coverage map heals itself.
 async function gapAlreadyCovered(model, state, gapKey) {
+  // Deterministic pre-pass: if a known factoid plainly matches the gap's pattern
+  // (music-ish for sound, occasion-ish for job), recategorize it — no model roulette.
+  if (gapKey === "sound" || gapKey === "job") {
+    const hit = state.factoids.find((f) => f.category !== gapKey && S.plausibleCategory(gapKey, f.text) === true && ["specific", "scene", "emotion"].includes(f.category));
+    if (hit) {
+      S.addFactoid(state, { category: gapKey, text: hit.text, verbatim: hit.verbatim, weight: hit.weight, flags: ["recategorized"] });
+      return true;
+    }
+  }
   const parsed = await chatJson(model, [
     { role: "system", content: `You check whether a topic is already covered by known facts. Output ONLY JSON: {"covered": boolean, "evidence": string}. covered=true ONLY if the facts genuinely contain material about the topic; evidence = the fact text that covers it, copied exactly. When unsure, covered=false.` },
     { role: "user", content: `TOPIC: ${S.CATEGORIES[gapKey].label}\n\nKNOWN FACTS:\n${S.knownDigest(state, 120)}` },
   ], { temperature: 0.1 });
   if (parsed && parsed.covered === true && typeof parsed.evidence === "string" && parsed.evidence.trim()) {
+    // The heal must clear the same plausibility floor as extraction — no junk coverage.
+    if (!S.plausibleCategory(gapKey, parsed.evidence)) return false;
     S.addFactoid(state, { category: gapKey, text: parsed.evidence.trim(), verbatim: "", weight: 3, flags: ["recategorized"] });
     return true;
   }
@@ -149,6 +163,13 @@ async function nextQuestion(model, state, lastAnswer) {
     return { question: `You touched on something tender — "${w}". Would you like the song to hold that part of the story, or steer around it?`, reflection: null, target: "consent", source: "fallback" };
   }
   const cat = target.target || "specific";
+  // Anchored fallback: name a known detail so the ask is for something NEW by construction.
+  if (cat === "specific") {
+    const known = S.sortedFactoids(state).find((f) => f.category === "specific" && f.text.split(/\s+/).length <= 12);
+    if (known) {
+      return { question: `Besides ${known.text.replace(/[.!?]+$/, "")} — what's one more thing about them almost nobody else does?`, reflection: null, target: cat, source: "fallback" };
+    }
+  }
   return { question: FALLBACKS[cat] || FALLBACKS.specific, reflection: null, target: cat, source: "fallback" };
 }
 

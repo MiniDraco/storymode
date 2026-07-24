@@ -46,10 +46,22 @@ function jaccard(a, b) {
   return inter / (A.size + B.size - inter);
 }
 
+// Plausibility floors for the load-bearing slots. A small model sometimes sprays
+// categories; junk in sound/job silently "completes" the slot and kills the question
+// that should have been asked. Demotion (not deletion) keeps the text and the question.
+const SOUND_RE = /\b(music|song|songs|sing|singer|singing|sings|band|artist|album|genre|country|rock|folk|jazz|blues|rap|hip.?hop|r&b|soul|gospel|pop|acoustic|guitar|piano|fiddle|drums?|melody|radio|playlist|record|vinyl|hums?|humming|whistl\w*|voice|vocal|tempo|upbeat|ballad|anthem|lullaby|[A-Z]\w+ (Mac|Haggard|Cash|Strait|Nicks|Seger))\b/i;
+const JOB_RE = /\b(birthday|wedding|anniversar\w*|memorial|funeral|retirement|graduation|proposal|christmas|reunion|party|celebration|reception|dinner|gathering|ceremony|surprise|occasion|plays? (at|for)|played at|hall|church|toast|slideshow|septemb\w*|octob\w*|novemb\w*|decemb\w*|januar\w*|februar\w*|march|april|may|june|july|august)\b/i;
+function plausibleCategory(cat, text) {
+  if (cat === "sound") return SOUND_RE.test(text);
+  if (cat === "job") return JOB_RE.test(text);
+  return true;
+}
+
 let _id = 0;
 function addFactoid(state, f) {
   const text = String(f.text || "").trim();
   if (!text) return null;
+  if (!plausibleCategory(f.category, text + " " + (f.verbatim || ""))) f = { ...f, category: "specific" };
   // Dedupe: same category + high token overlap = same fact. Keep the heavier one.
   // Category-scoped on purpose — "whistles Merle Haggard" may legitimately live as
   // both a specific (habit) and a sound (music direction).
@@ -128,4 +140,5 @@ module.exports = {
   CATEGORIES, CAT_KEYS, GAP_PRIORITY, HARD_CEILING,
   createState, addFactoid, byCategory, coverage, gaps, readiness,
   sortedFactoids, knownDigest, heatFrom, jaccard, norm, tokens,
+  plausibleCategory,
 };

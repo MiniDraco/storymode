@@ -47,7 +47,9 @@ class StoryState {
     fun addFactoid(category: String, text: String, verbatim: String, weight: Double, flags: List<String>): Factoid? {
         val t = text.trim()
         if (t.isEmpty()) return null
-        val cat = if (CATEGORIES.containsKey(category)) category else "specific"
+        var cat0 = category
+        if (!plausibleCategory(cat0, "$t $verbatim")) cat0 = "specific"
+        val cat = if (CATEGORIES.containsKey(cat0)) cat0 else "specific"
         for (g in factoids) {
             if (g.category == cat && jaccard(g.text, t) >= 0.6) {
                 if (weight > g.weight) { g.text = t; g.weight = weight; if (verbatim.isNotBlank()) g.verbatim = verbatim }
@@ -104,6 +106,16 @@ class StoryState {
     }
 
     companion object {
+        // Plausibility floors for the load-bearing slots — junk in sound/job silently
+        // "completes" the slot and kills the question that should have been asked.
+        private val SOUND_RE = Regex("\\b(music|song|songs|sing|singer|singing|sings|band|artist|album|genre|country|rock|folk|jazz|blues|rap|hip.?hop|r&b|soul|gospel|pop|acoustic|guitar|piano|fiddle|drums?|melody|radio|playlist|record|vinyl|hums?|humming|whistl\\w*|voice|vocal|tempo|upbeat|ballad|anthem|lullaby|[A-Z]\\w+ (Mac|Haggard|Cash|Strait|Nicks|Seger))\\b", RegexOption.IGNORE_CASE)
+        private val JOB_RE = Regex("\\b(birthday|wedding|anniversar\\w*|memorial|funeral|retirement|graduation|proposal|christmas|reunion|party|celebration|reception|dinner|gathering|ceremony|surprise|occasion|plays? (at|for)|played at|hall|church|toast|slideshow|septemb\\w*|octob\\w*|novemb\\w*|decemb\\w*|januar\\w*|februar\\w*|march|april|may|june|july|august)\\b", RegexOption.IGNORE_CASE)
+        fun plausibleCategory(cat: String, text: String): Boolean = when (cat) {
+            "sound" -> SOUND_RE.containsMatchIn(text)
+            "job" -> JOB_RE.containsMatchIn(text)
+            else -> true
+        }
+
         fun norm(s: String) = s.lowercase().replace(Regex("[^a-z0-9\\s]"), " ").replace(Regex("\\s+"), " ").trim()
         fun tokens(s: String) = norm(s).split(" ").filter { it.length > 2 }
         fun jaccard(a: String, b: String): Double {

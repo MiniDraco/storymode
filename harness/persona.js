@@ -22,11 +22,21 @@ function makeAnswerFn(personaKey, actorModel) {
     }
     const shown = (reflection ? reflection + "\n\n" : "") + question;
     history.push({ role: "user", content: shown });
-    const reply = await chat(actorModel, [
-      { role: "system", content: p.card + `\nStyle: ${p.style}. Reply with ONLY your in-character answer — no quotes, no narration, no stage directions.` },
-      ...history,
-    ], { temperature: 0.7 });
-    const clean = reply.trim().replace(/^["']|["']$/g, "");
+    const sys = { role: "system", content: p.card + `\nStyle: ${p.style}. Reply with ONLY your in-character answer — no quotes, no narration, no stage directions.` };
+    let reply = await chat(actorModel, [sys, ...history], { temperature: 0.7 });
+    let clean = reply.trim().replace(/^["']|["']$/g, "");
+    // Enforce terse personas for real: one retry, then hard cut at a sentence boundary.
+    if (p.maxWords && clean.split(/\s+/).length > p.maxWords + 3) {
+      reply = await chat(actorModel, [sys, ...history,
+        { role: "assistant", content: clean },
+        { role: "user", content: `(That was too many words for ${p.label}. Answer again, ${p.maxWords} words or fewer.)` },
+      ], { temperature: 0.7 });
+      clean = reply.trim().replace(/^["']|["']$/g, "");
+      if (clean.split(/\s+/).length > p.maxWords + 3) {
+        const first = clean.match(/[^.!?]+[.!?]?/);
+        clean = (first ? first[0] : clean).split(/\s+/).slice(0, p.maxWords).join(" ");
+      }
+    }
     history.push({ role: "assistant", content: clean });
     return clean;
   };
