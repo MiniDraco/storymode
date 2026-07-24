@@ -79,7 +79,7 @@ class MediaPipeBridge(context: Context, modelFile: File) : LlmBridge {
     init {
         val options = LlmInference.LlmInferenceOptions.builder()
             .setModelPath(modelFile.absolutePath)
-            .setMaxTokens(2048)
+            .setMaxTokens(4096) // matches the shipped model's ekv4096 KV window
             .build()
         llm = LlmInference.createFromOptions(context, options)
     }

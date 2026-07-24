@@ -187,7 +187,7 @@ object Question {
         if (target is Target.Relationship) return Next("Who is ${state.name} to you — how do you two know each other?", null, "identity", "fixed")
         // Consent is too load-bearing for model wording — the code-authored form has never failed an audit.
         if (target is Target.Consent) {
-            val src = target.wound.verbatim.ifBlank { target.wound.text }
+            val src = target.wound.verbatim.ifBlank { target.wound.text }.trim('"', '\'', ' ')
             val w = if (src.length > 80) src.take(77) + "…" else src
             return Next("You touched on something tender — \"$w\". Would you like the song to hold that part of the story, or steer around it?", null, "consent", "fixed")
         }
@@ -236,11 +236,20 @@ object Question {
         return a.isNotEmpty() && state.asked.all { !StoryState.norm(it).contains(a) }
     }
 
-    fun fallbackFor(state: StoryState, cat: String): String? {
-        fun short(t: String): String {
-            val s = t.trimEnd('.', '!', '?')
-            return if (s.length > 60) s.take(57) + "…" else s
+    /** Single most distinctive clause of a factoid — identity clauses and bare names dropped. */
+    private fun anchorClause(t: String): String {
+        val base = t.trimEnd('.', '!', '?')
+        val clauses = base.split(Regex(",|;| and ", RegexOption.IGNORE_CASE)).map { it.trim() }.filter { it.split(Regex("\\s+")).size >= 2 }
+        val concrete = clauses.filter {
+            !Regex("^(my|his|her|their) (wife|husband|dad|father|mom|mother|son|daughter|friend|best friend)\\b", RegexOption.IGNORE_CASE).containsMatchIn(it) &&
+                !Regex("^[A-Z][a-z]+$").matches(it)
         }
+        val pick = (concrete.ifEmpty { clauses }).maxByOrNull { it.length } ?: base
+        return if (pick.length > 60) pick.take(57) + "…" else pick
+    }
+
+    fun fallbackFor(state: StoryState, cat: String): String? {
+        fun short(t: String) = anchorClause(t)
         ANCHOR_ASKS[cat]?.let { ask ->
             // At most 2 anchored fallbacks per story-material category — then move on.
             if ((state.fallbackCounts[cat] ?: 0) >= 2) return null

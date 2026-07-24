@@ -3,10 +3,13 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- Cleartext allowed for the LAN dev bridge (Ollama over plain HTTP on the home network).
+         The shipping on-device path makes no network calls at all. -->
     <application
         android:label="Story Mode"
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.StoryMode"
+        android:usesCleartextTraffic="true"
         android:allowBackup="true">
 
         <activity
