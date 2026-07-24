@@ -66,6 +66,7 @@ object Question {
         data class Gap(val target: String) : Target()
         object Name : Target()
         data class NameConfirm(val candidate: String) : Target()
+        object Relationship : Target()
         object Done : Target()
     }
 
@@ -74,8 +75,7 @@ object Question {
         // recategorized directly — no model roulette.
         if (gapKey in listOf("sound", "job", "identity")) {
             val hit = state.factoids.firstOrNull {
-                it.category != gapKey && it.category in listOf("specific", "scene", "emotion") &&
-                    StoryState.coversGap(gapKey, "${it.text} ${it.verbatim}")
+                it.category != gapKey && StoryState.coversGap(gapKey, "${it.text} ${it.verbatim}")
             }
             if (hit != null) {
                 state.addFactoid(gapKey, hit.text, hit.verbatim, hit.weight, listOf("recategorized"))
@@ -117,6 +117,17 @@ object Question {
         }
         for (cat in g) {
             if (gapAlreadyCovered(llm, state, cat)) continue
+            // Identity decomposes: name flow or fixed relationship ask — never a compound generic.
+            if (cat == "identity") {
+                if (state.name == null && !state.nameAsked) {
+                    state.nameAsked = true
+                    val candidate = StoryState.nameCandidate(state)
+                    if (candidate != null) { state.name = candidate; return Target.NameConfirm(candidate) }
+                    return Target.Name
+                }
+                if (state.name != null) return Target.Relationship
+                continue
+            }
             return Target.Gap(cat)
         }
         return Target.Done
@@ -154,6 +165,12 @@ object Question {
         if (target is Target.Done) return Next(null, null, null, "covered", done = true)
         if (target is Target.Name) return Next("What's their name — what do you call them?", null, "identity", "fixed")
         if (target is Target.NameConfirm) return Next("I want the name sung exactly right — the song is about ${target.candidate}, spelled just like that?", null, "identity", "fixed")
+        if (target is Target.Relationship) return Next("Who is ${state.name} to you — how do you two know each other?", null, "identity", "fixed")
+        // Consent is too load-bearing for model wording — the code-authored form has never failed an audit.
+        if (target is Target.Consent) {
+            val w = target.wound.text.let { if (it.length > 80) it.take(77) + "…" else it }
+            return Next("You touched on something tender — \"$w\". Would you like the song to hold that part of the story, or steer around it?", null, "consent", "fixed")
+        }
         val ctx = buildContext(state, lastAnswer, target)
         val kind = when (target) { is Target.Consent -> "consent"; is Target.Heat -> "heat"; is Target.Gap -> "gap"; else -> null }
         var messages = mutableListOf(Msg("system", systemPrompt), Msg("user", ctx))
@@ -172,14 +189,12 @@ object Question {
                     Msg("user", "Rejected: ${problems.joinToString("; ")}. Produce a corrected JSON object following every rule.")).toMutableList()
             }
         }
-        if (target is Target.Consent) {
-            val w = target.wound.text.let { if (it.length > 80) it.take(77) + "…" else it }
-            return Next("You touched on something tender — \"$w\". Would you like the song to hold that part of the story, or steer around it?", null, "consent", "fallback")
-        }
         val cat = when (target) { is Target.Gap -> target.target; is Target.Heat -> target.target; else -> "specific" }
         fallbackFor(state, cat)?.let { return Next(it, null, cat, "fallback") }
+        // Cross-gap fallbacks must clear the heal check, or they re-ask hidden coverage.
         for (other in state.gaps()) {
-            if (other == cat) continue
+            if (other == cat || other == "identity") continue
+            if (gapAlreadyCovered(llm, state, other)) continue
             fallbackFor(state, other)?.let { return Next(it, null, other, "fallback") }
         }
         return Next(null, null, null, "exhausted", done = true)

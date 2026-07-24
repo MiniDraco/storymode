@@ -82,7 +82,7 @@ async function gapAlreadyCovered(model, state, gapKey) {
   // (music-ish for sound, occasion-ish for job, relationship words for identity),
   // recategorize it — no model roulette.
   if (["sound", "job", "identity"].includes(gapKey)) {
-    const hit = state.factoids.find((f) => f.category !== gapKey && S.coversGap(gapKey, f.text + " " + (f.verbatim || "")) && ["specific", "scene", "emotion"].includes(f.category));
+    const hit = state.factoids.find((f) => f.category !== gapKey && S.coversGap(gapKey, f.text + " " + (f.verbatim || "")));
     if (hit) {
       S.addFactoid(state, { category: gapKey, text: hit.text, verbatim: hit.verbatim, weight: hit.weight, flags: ["recategorized"] });
       return true;
@@ -126,6 +126,18 @@ async function pickTarget(model, state) {
   // Otherwise: first gap that isn't secretly covered already.
   for (const cat of g) {
     if (await gapAlreadyCovered(model, state, cat)) continue;
+    // Identity decomposes: the name flow handles names; relationship gets a fixed ask.
+    // A generic "who is this song for" is compound and re-asks whichever half is known.
+    if (cat === "identity") {
+      if (!state.name && !state.nameAsked) {
+        state.nameAsked = true;
+        const candidate = S.nameCandidate(state);
+        if (candidate) { state.name = candidate; return { kind: "nameConfirm", candidate }; }
+        return { kind: "name" };
+      }
+      if (state.name) return { kind: "relationship" };
+      continue; // name asked and unanswered — don't hammer identity
+    }
     return { kind: "gap", target: cat };
   }
   return { kind: "done" };
@@ -165,6 +177,15 @@ async function nextQuestion(model, state, lastAnswer) {
   if (target.kind === "nameConfirm") {
     return { question: `I want the name sung exactly right — the song is about ${target.candidate}, spelled just like that?`, reflection: null, target: "identity", source: "fixed" };
   }
+  if (target.kind === "relationship") {
+    return { question: `Who is ${state.name} to you — how do you two know each other?`, reflection: null, target: "identity", source: "fixed" };
+  }
+  // Consent is too load-bearing for model wording: the code-authored form names the
+  // wound plainly and asks the one decision. It has never failed an audit.
+  if (target.kind === "consent") {
+    const w = target.wound.text.length > 80 ? target.wound.text.slice(0, 77) + "…" : target.wound.text;
+    return { question: `You touched on something tender — "${w}". Would you like the song to hold that part of the story, or steer around it?`, reflection: null, target: "consent", source: "fixed" };
+  }
   const ctx = buildContext(state, lastAnswer, target);
   let messages = [
     { role: "system", content: PROMPT },
@@ -187,16 +208,14 @@ async function nextQuestion(model, state, lastAnswer) {
     }
   }
   // Model failed twice — deterministic fallback keeps the interview alive.
-  if (target.kind === "consent") {
-    const w = target.wound.text.length > 80 ? target.wound.text.slice(0, 77) + "…" : target.wound.text;
-    return { question: `You touched on something tender — "${w}". Would you like the song to hold that part of the story, or steer around it?`, reflection: null, target: "consent", source: "fallback" };
-  }
   const cat = target.target || "specific";
   const q = fallbackFor(state, cat);
   if (q) return { question: q, reflection: null, target: cat, source: "fallback" };
   // This category's fallbacks are exhausted — try the other open gaps before giving up.
+  // Each must clear the heal check first, or the fallback re-asks hidden coverage.
   for (const other of S.gaps(state)) {
-    if (other === cat) continue;
+    if (other === cat || other === "identity") continue;
+    if (await gapAlreadyCovered(model, state, other)) continue;
     const oq = fallbackFor(state, other);
     if (oq) return { question: oq, reflection: null, target: other, source: "fallback" };
   }
