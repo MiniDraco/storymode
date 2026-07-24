@@ -19,14 +19,17 @@ object Question {
     )
 
     private val EXCLUSION = Regex("\\b(besides|another|one more|something else|anything else|different|other than|new)\\b", RegexOption.IGNORE_CASE)
+    private val DEEPEN = Regex("\\b(a time|one time|one moment|the (day|night|morning|moment) |that (day|night|morning)|what happened|when (he|she|they|you|it) )\\b", RegexOption.IGNORE_CASE)
     private val COMMON_BIGRAM_WORDS = setOf("about", "there", "their", "would", "could", "should", "always", "never", "really", "thing", "things", "something", "someone")
 
-    /** A question reusing the customer's distinctive phrase from their last answer without exclusion framing asks for what it was just told. */
-    private fun recyclesLastAnswer(q: String, lastAnswer: String?): Boolean {
-        if (lastAnswer.isNullOrBlank() || EXCLUSION.containsMatchIn(q)) return false
+    /** Reusing the customer's distinctive phrase from ANY prior answer without exclusion/deepening framing is re-telling and re-asking. */
+    private fun recyclesKnown(q: String, state: StoryState): Boolean {
+        if (EXCLUSION.containsMatchIn(q) || DEEPEN.containsMatchIn(q)) return false
+        val allAnswers = state.transcript.joinToString(" ") { it.a }
+        if (allAnswers.isBlank()) return false
         fun strip(s: String) = StoryState.tokens(s).filter { it.length >= 4 && it !in COMMON_BIGRAM_WORDS }
         val qt = strip(q)
-        val an = " " + strip(lastAnswer).joinToString(" ") + " "
+        val an = " " + strip(allAnswers).joinToString(" ") + " "
         for (i in 0 until qt.size - 1) {
             if (an.contains(" " + qt[i] + " " + qt[i + 1] + " ")) return true
         }
@@ -47,7 +50,8 @@ object Question {
         if (state.turn >= 1 && META.containsMatchIn(q)) problems.add("meta-question / restatement of the opening")
         if (state.turn >= 1 && GENERIC.containsMatchIn(q)) problems.add("generic 'what stood out' form — name a known detail and ask for something different")
         if (COMPOUND.containsMatchIn(q)) problems.add("compound question — one ask only")
-        if (kind != "consent" && recyclesLastAnswer(q, lastAnswer)) problems.add("reuses the customer's own phrase from their last answer without 'Besides…' exclusion framing — that asks for what they just gave")
+        if (kind != "consent" && recyclesKnown(q, state)) problems.add("reuses the customer's own phrase without 'Besides…' or 'a time when…' framing — that asks for what they already gave")
+        if (Regex("[\\[\\]]|\\bname:").containsMatchIn(q)) problems.add("internal notation leaked into the question")
         if (state.asked.any { jaccard(it, q) >= 0.45 }) problems.add("near-duplicate of an asked question")
         // Revisiting the same moment in new words: any shared 3-gram with a prior question,
         // computed over stopword-stripped tokens so "the night"/"that night" can't dodge it.

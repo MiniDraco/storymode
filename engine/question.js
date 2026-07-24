@@ -18,17 +18,21 @@ const GENERIC = /\b(stood out|stands? out|notice(d)? most|remember most|makes? (
 const COMPOUND = /\band (why|what|how|when|where|who)\b/i;
 
 const EXCLUSION = /\b(besides|another|one more|something else|anything else|different|other than|new)\b/i;
+// Deepening frames make phrase reuse legitimate: asking for a specific INSTANCE of a
+// known thing is not a re-ask ("tell me about a time when his laugh...").
+const DEEPEN = /\b(a time|one time|one moment|the (day|night|morning|moment) |that (day|night|morning)|what happened|when (he|she|they|you|it) )\b/i;
 const COMMON_BIGRAM_WORDS = new Set(["about", "there", "their", "would", "could", "should", "always", "never", "really", "thing", "things", "something", "someone"]);
 
-// A question that reuses the customer's own distinctive phrase from the answer they
-// just gave — without "besides/another" exclusion framing — is asking for what it was
-// just told, in their own words. The politest possible proof of not listening.
-function recyclesLastAnswer(q, lastAnswer) {
-  if (!lastAnswer) return false;
-  if (EXCLUSION.test(q)) return false;
+// A question that reuses the customer's own distinctive phrase from ANY prior answer —
+// without exclusion or deepening framing — is re-telling them what they said and asking
+// for it again. The politest possible proof of not listening.
+function recyclesKnown(q, state) {
+  if (EXCLUSION.test(q) || DEEPEN.test(q)) return false;
+  const allAnswers = state.transcript.map((t) => t.a).join(" ");
+  if (!allAnswers) return false;
   const strip = (s) => S.tokens(s).filter((w) => w.length >= 4 && !COMMON_BIGRAM_WORDS.has(w));
   const qt = strip(q);
-  const an = " " + strip(lastAnswer).join(" ") + " ";
+  const an = " " + strip(allAnswers).join(" ") + " ";
   for (let i = 0; i + 1 < qt.length; i++) {
     if (an.includes(" " + qt[i] + " " + qt[i + 1] + " ")) return true;
   }
@@ -49,7 +53,8 @@ function validateQuestion(q, state, kind, lastAnswer) {
   if (state.turn >= 1 && META.test(q)) problems.push("meta-question / restatement of the opening");
   if (state.turn >= 1 && GENERIC.test(q)) problems.push("generic 'what stood out' form — name a known detail and ask for something different");
   if (COMPOUND.test(q)) problems.push("compound question — one ask only");
-  if (kind !== "consent" && recyclesLastAnswer(q, lastAnswer)) problems.push("reuses the customer's own phrase from their last answer without 'Besides…' exclusion framing — that asks for what they just gave");
+  if (kind !== "consent" && recyclesKnown(q, state)) problems.push("reuses the customer's own phrase without 'Besides…' or 'a time when…' framing — that asks for what they already gave");
+  if (/[\[\]]|\bname:/.test(q)) problems.push("internal notation leaked into the question");
   // Near-duplicate of an already-asked question?
   for (const prev of state.asked) {
     if (S.jaccard(prev, q) >= 0.45) { problems.push("near-duplicate of an asked question"); break; }
