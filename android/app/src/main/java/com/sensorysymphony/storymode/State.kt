@@ -50,13 +50,14 @@ class StoryState {
         var cat0 = category
         if (!plausibleCategory(cat0, "$t $verbatim")) cat0 = "specific"
         val cat = if (CATEGORIES.containsKey(cat0)) cat0 else "specific"
+        val cleanFlags = if ("wound" in flags && !plausibleWound("$t $verbatim")) flags.filter { it != "wound" } else flags
         for (g in factoids) {
             if (g.category == cat && jaccard(g.text, t) >= 0.6) {
                 if (weight > g.weight) { g.text = t; g.weight = weight; if (verbatim.isNotBlank()) g.verbatim = verbatim }
                 return g
             }
         }
-        val rec = Factoid(++nextId, cat, t, verbatim.trim(), weight.coerceIn(0.0, 10.0), flags.toMutableList(), turn)
+        val rec = Factoid(++nextId, cat, t, verbatim.trim(), weight.coerceIn(0.0, 10.0), cleanFlags.toMutableList(), turn)
         factoids.add(rec)
         return rec
     }
@@ -115,6 +116,10 @@ class StoryState {
             "job" -> JOB_RE.containsMatchIn(text)
             else -> true
         }
+
+        // A "wound" needs actual pain in it — a consent question aimed at warmth reads as a re-ask.
+        private val WOUND_RE = Regex("\\b(died?|dying|death|passed( away)?|cancer|funeral|buried|grave|lost (him|her|them|my)|loss|grief|griev\\w*|mourn\\w*|divorc\\w*|cheat\\w*|betray\\w*|affair|accident|crash|hospital|hospice|diagnos\\w*|heart attack|stroke|suicide|overdos\\w*|addict\\w*|rehab|sober|abus\\w*|estrang\\w*|didn'?t (speak|talk)|not (speak|talk)ing|no longer (here|with us)|gone now|miss (him|her|them)|widow\\w*|jail|prison|deploy\\w*|war|ptsd|depress\\w*|anxiety|cried|crying|tears|wreck|painful|the pain|hurt\\w*|struggl\\w*|nightmare)\\b", RegexOption.IGNORE_CASE)
+        fun plausibleWound(text: String) = WOUND_RE.containsMatchIn(text)
 
         fun norm(s: String) = s.lowercase().replace(Regex("[^a-z0-9\\s]"), " ").replace(Regex("\\s+"), " ").trim()
         fun tokens(s: String) = norm(s).split(" ").filter { it.length > 2 }

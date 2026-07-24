@@ -57,11 +57,19 @@ function plausibleCategory(cat, text) {
   return true;
 }
 
+// A "wound" needs actual pain in it — small models spray the flag onto warmth,
+// and a consent question aimed at a non-wound reads as a re-ask (and feels absurd).
+const WOUND_RE = /\b(died?|dying|death|passed( away)?|cancer|funeral|buried|grave|lost (him|her|them|my)|loss|grief|griev\w*|mourn\w*|divorc\w*|cheat\w*|betray\w*|affair|accident|crash|hospital|hospice|diagnos\w*|heart attack|stroke|suicide|overdos\w*|addict\w*|rehab|sober|abus\w*|estrang\w*|didn'?t (speak|talk)|not (speak|talk)ing|no longer (here|with us)|gone now|miss (him|her|them)|widow\w*|jail|prison|deploy\w*|war|ptsd|depress\w*|anxiety|cried|crying|tears|wreck|painful|the pain|hurt\w*|struggl\w*|nightmare)\b/i;
+function plausibleWound(text) { return WOUND_RE.test(text); }
+
 let _id = 0;
 function addFactoid(state, f) {
   const text = String(f.text || "").trim();
   if (!text) return null;
   if (!plausibleCategory(f.category, text + " " + (f.verbatim || ""))) f = { ...f, category: "specific" };
+  if (Array.isArray(f.flags) && f.flags.includes("wound") && !plausibleWound(text + " " + (f.verbatim || ""))) {
+    f = { ...f, flags: f.flags.filter((x) => x !== "wound") };
+  }
   // Dedupe: same category + high token overlap = same fact. Keep the heavier one.
   // Category-scoped on purpose — "whistles Merle Haggard" may legitimately live as
   // both a specific (habit) and a sound (music direction).
@@ -140,5 +148,5 @@ module.exports = {
   CATEGORIES, CAT_KEYS, GAP_PRIORITY, HARD_CEILING,
   createState, addFactoid, byCategory, coverage, gaps, readiness,
   sortedFactoids, knownDigest, heatFrom, jaccard, norm, tokens,
-  plausibleCategory,
+  plausibleCategory, plausibleWound,
 };

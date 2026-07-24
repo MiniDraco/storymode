@@ -150,12 +150,40 @@ object Question {
             return Next("You touched on something tender — \"$w\". Would you like the song to hold that part of the story, or steer around it?", null, "consent", "fallback")
         }
         val cat = when (target) { is Target.Gap -> target.target; is Target.Heat -> target.target; else -> "specific" }
-        if (cat == "specific") {
-            val known = state.sortedFactoids().firstOrNull { it.category == "specific" && it.text.split(Regex("\\s+")).size <= 12 }
-            if (known != null) {
-                return Next("Besides ${known.text.trimEnd('.', '!', '?')} — what's one more thing about them almost nobody else does?", null, cat, "fallback")
+        fallbackFor(state, cat)?.let { return Next(it, null, cat, "fallback") }
+        for (other in state.gaps()) {
+            if (other == cat) continue
+            fallbackFor(state, other)?.let { return Next(it, null, other, "fallback") }
+        }
+        return Next(null, null, null, "exhausted", done = true)
+    }
+
+    // Anchored, dedupe-aware fallbacks: anchors rotate newest-first; near-repeats are skipped.
+    private val ANCHOR_ASKS: Map<String, (String) -> String> = mapOf(
+        "specific" to { a -> "Besides $a — what's one more thing about them almost nobody else does?" },
+        "scene" to { a -> "Besides $a — tell me about one more moment with them that stays with you?" },
+        "emotion" to { a -> "When you think about $a — what's the feeling underneath it?" },
+    )
+
+    private fun notAsked(state: StoryState, q: String) = state.asked.all { jaccard(it, q) < 0.45 }
+
+    fun fallbackFor(state: StoryState, cat: String): String? {
+        fun short(t: String): String {
+            val s = t.trimEnd('.', '!', '?')
+            return if (s.length > 60) s.take(57) + "…" else s
+        }
+        ANCHOR_ASKS[cat]?.let { ask ->
+            val anchorCats = if (cat == "scene") listOf("scene", "specific") else listOf(cat, "specific").distinct()
+            val anchors = state.factoids
+                .filter { it.category in anchorCats && it.text.split(Regex("\\s+")).size <= 14 }
+                .sortedWith(compareByDescending<Factoid> { it.turn }.thenByDescending { it.weight })
+            for (a in anchors) {
+                val q = ask(short(a.text))
+                if (notAsked(state, q)) return q
             }
         }
-        return Next(FALLBACKS[cat] ?: FALLBACKS["specific"]!!, null, cat, "fallback")
+        val generic = FALLBACKS[cat]
+        if (generic != null && notAsked(state, generic)) return generic
+        return null
     }
 }

@@ -163,14 +163,44 @@ async function nextQuestion(model, state, lastAnswer) {
     return { question: `You touched on something tender — "${w}". Would you like the song to hold that part of the story, or steer around it?`, reflection: null, target: "consent", source: "fallback" };
   }
   const cat = target.target || "specific";
-  // Anchored fallback: name a known detail so the ask is for something NEW by construction.
-  if (cat === "specific") {
-    const known = S.sortedFactoids(state).find((f) => f.category === "specific" && f.text.split(/\s+/).length <= 12);
-    if (known) {
-      return { question: `Besides ${known.text.replace(/[.!?]+$/, "")} — what's one more thing about them almost nobody else does?`, reflection: null, target: cat, source: "fallback" };
+  const q = fallbackFor(state, cat);
+  if (q) return { question: q, reflection: null, target: cat, source: "fallback" };
+  // This category's fallbacks are exhausted — try the other open gaps before giving up.
+  for (const other of S.gaps(state)) {
+    if (other === cat) continue;
+    const oq = fallbackFor(state, other);
+    if (oq) return { question: oq, reflection: null, target: other, source: "fallback" };
+  }
+  return { question: null, reflection: null, target: null, source: "exhausted", done: true };
+}
+
+// Anchored, dedupe-aware fallbacks. Anchors rotate newest-first so a repeat ask is
+// impossible by construction; a question too close to anything already asked is skipped.
+const ANCHOR_ASKS = {
+  specific: (a) => `Besides ${a} — what's one more thing about them almost nobody else does?`,
+  scene: (a) => `Besides ${a} — tell me about one more moment with them that stays with you?`,
+  emotion: (a) => `When you think about ${a} — what's the feeling underneath it?`,
+};
+
+function notAsked(state, q) {
+  return q && state.asked.every((prev) => S.jaccard(prev, q) < 0.45);
+}
+
+function fallbackFor(state, cat) {
+  const short = (t) => t.replace(/[.!?]+$/, "").length > 60 ? t.replace(/[.!?]+$/, "").slice(0, 57) + "…" : t.replace(/[.!?]+$/, "");
+  if (ANCHOR_ASKS[cat]) {
+    const anchorCats = cat === "scene" ? ["scene", "specific"] : [cat === "specific" ? "specific" : cat, "specific"];
+    const anchors = [...state.factoids]
+      .filter((f) => anchorCats.includes(f.category) && f.text.split(/\s+/).length <= 14)
+      .sort((a, b) => b.turn - a.turn || b.weight - a.weight);
+    for (const a of anchors) {
+      const q = ANCHOR_ASKS[cat](short(a.text));
+      if (notAsked(state, q)) return q;
     }
   }
-  return { question: FALLBACKS[cat] || FALLBACKS.specific, reflection: null, target: cat, source: "fallback" };
+  const generic = FALLBACKS[cat];
+  if (generic && notAsked(state, generic)) return generic;
+  return null;
 }
 
 module.exports = { nextQuestion, validateQuestion, reflectionGrounded, buildContext, FALLBACKS };
