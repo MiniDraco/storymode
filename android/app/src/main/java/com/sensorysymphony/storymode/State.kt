@@ -130,6 +130,24 @@ class StoryState {
         private val WOUND_RE = Regex("\\b(died?|dying|death|passed( away)?|cancer|funeral|buried|grave|lost (him|her|them|my)|loss|grief|griev\\w*|mourn\\w*|divorc\\w*|cheat\\w*|betray\\w*|affair|accident|crash|hospital|hospice|diagnos\\w*|heart attack|stroke|suicide|overdos\\w*|addict\\w*|rehab|sober|abus\\w*|estrang\\w*|didn'?t (speak|talk)|not (speak|talk)ing|no longer (here|with us)|gone now|miss (him|her|them)|widow\\w*|jail|prison|deploy\\w*|war|ptsd|depress\\w*|anxiety|cried|crying|tears|wreck|painful|the pain|hurt\\w*|struggl\\w*|nightmare)\\b", RegexOption.IGNORE_CASE)
         fun plausibleWound(text: String) = WOUND_RE.containsMatchIn(text)
 
+        private val NAME_STOP = setOf("The","She","He","They","We","And","But","So","Oh","You","It","My","Her","His","Their","When","What","Like","Just","Every","One","That","This","There","Then","Now","Well","Yeah","Also","Even","Not","All","If","Or","Because","January","February","March","April","May","June","July","August","September","October","November","December","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Christmas","God","Mom","Dad","Ma","Pa","Grandma","Grandpa")
+
+        /** Most frequent mid-sentence capitalized word in the customer's answers — confirmed, never assumed. */
+        fun nameCandidate(state: StoryState): String? {
+            val counts = mutableMapOf<String, Int>()
+            for (t in state.transcript) {
+                for (sentence in t.a.split(Regex("[.!?\\n]+"))) {
+                    val words = sentence.trim().split(Regex("\\s+"))
+                    for (i in 1 until words.size) {
+                        val w = words[i].replace(Regex("[^A-Za-z']"), "")
+                        if (Regex("^[A-Z][a-z]{2,}$").matches(w) && w !in NAME_STOP) counts[w] = (counts[w] ?: 0) + 1
+                    }
+                }
+            }
+            val best = counts.entries.maxByOrNull { it.value }
+            return if (best != null && best.value >= 2) best.key else null
+        }
+
         fun norm(s: String) = s.lowercase().replace(Regex("[^a-z0-9\\s]"), " ").replace(Regex("\\s+"), " ").trim()
         fun tokens(s: String) = norm(s).split(" ").filter { it.length > 2 }
         fun jaccard(a: String, b: String): Double {

@@ -109,10 +109,12 @@ async function pickTarget(model, state) {
     state.woundConsentAsked = true;
     return { kind: "consent", wound };
   }
-  // A song needs the name. If identity is covered but no name ever surfaced, ask for
-  // exactly that, once — a fixed question that cannot re-ask anything.
+  // A song needs the name. If extraction never flagged one, confirm the transcript's
+  // best candidate (confirmation can never be a re-ask) — or ask plainly if there is none.
   if (!state.name && !state.nameAsked && state.turn >= 1 && !S.gaps(state).includes("identity")) {
     state.nameAsked = true;
+    const candidate = S.nameCandidate(state);
+    if (candidate) { state.name = candidate; return { kind: "nameConfirm", candidate }; }
     return { kind: "name" };
   }
   // Follow the heat: a hot thread from the last answer that still serves an open gap.
@@ -159,6 +161,9 @@ async function nextQuestion(model, state, lastAnswer) {
   if (target.kind === "done") return { question: null, reflection: null, target: null, source: "covered", done: true };
   if (target.kind === "name") {
     return { question: "What's their name — what do you call them?", reflection: null, target: "identity", source: "fixed" };
+  }
+  if (target.kind === "nameConfirm") {
+    return { question: `I want the name sung exactly right — the song is about ${target.candidate}, spelled just like that?`, reflection: null, target: "identity", source: "fixed" };
   }
   const ctx = buildContext(state, lastAnswer, target);
   let messages = [

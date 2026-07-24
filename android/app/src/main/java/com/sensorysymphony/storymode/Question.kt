@@ -65,6 +65,7 @@ object Question {
         data class Heat(val thread: Factoid, val target: String) : Target()
         data class Gap(val target: String) : Target()
         object Name : Target()
+        data class NameConfirm(val candidate: String) : Target()
         object Done : Target()
     }
 
@@ -100,9 +101,12 @@ object Question {
             state.woundConsentAsked = true
             return Target.Consent(wound)
         }
-        // A song needs the name: if identity is covered but no name surfaced, ask exactly that, once.
+        // A song needs the name: confirm the transcript's best candidate (confirmation can
+        // never be a re-ask) — or ask plainly if there is none.
         if (state.name == null && !state.nameAsked && state.turn >= 1 && "identity" !in state.gaps()) {
             state.nameAsked = true
+            val candidate = StoryState.nameCandidate(state)
+            if (candidate != null) { state.name = candidate; return Target.NameConfirm(candidate) }
             return Target.Name
         }
         val g = state.gaps()
@@ -149,6 +153,7 @@ object Question {
         val target = pickTarget(llm, state)
         if (target is Target.Done) return Next(null, null, null, "covered", done = true)
         if (target is Target.Name) return Next("What's their name — what do you call them?", null, "identity", "fixed")
+        if (target is Target.NameConfirm) return Next("I want the name sung exactly right — the song is about ${target.candidate}, spelled just like that?", null, "identity", "fixed")
         val ctx = buildContext(state, lastAnswer, target)
         val kind = when (target) { is Target.Consent -> "consent"; is Target.Heat -> "heat"; is Target.Gap -> "gap"; else -> null }
         var messages = mutableListOf(Msg("system", systemPrompt), Msg("user", ctx))
