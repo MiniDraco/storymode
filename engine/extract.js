@@ -66,9 +66,12 @@ async function extractFromAnswer(model, question, answer, onProgress) {
       if (!f || typeof f.text !== "string") continue;
       const verbatim = typeof f.verbatim === "string" ? f.verbatim : f.text;
       if (!grounded(verbatim, chunks[i])) continue; // dropped: not in the customer's words
+      // The text must be the customer's words too — paraphrase drift gets replaced
+      // by the verbatim it points to. The model files; it never rewrites.
+      const text = grounded(f.text, chunks[i]) ? f.text : verbatim;
       out.push({
         category: f.category,
-        text: f.text,
+        text,
         verbatim,
         weight: Number(f.heat) || 3,
         flags: Array.isArray(f.flags) ? f.flags.filter((x) => typeof x === "string") : [],

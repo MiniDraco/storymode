@@ -18,7 +18,22 @@ object Question {
         "boundary" to "What should this song stay away from — anything that shouldn't be mentioned?",
     )
 
-    fun validate(q: String?, state: StoryState, kind: String? = null): List<String> {
+    private val EXCLUSION = Regex("\\b(besides|another|one more|something else|anything else|different|other than|new)\\b", RegexOption.IGNORE_CASE)
+    private val COMMON_BIGRAM_WORDS = setOf("about", "there", "their", "would", "could", "should", "always", "never", "really", "thing", "things", "something", "someone")
+
+    /** A question reusing the customer's distinctive phrase from their last answer without exclusion framing asks for what it was just told. */
+    private fun recyclesLastAnswer(q: String, lastAnswer: String?): Boolean {
+        if (lastAnswer.isNullOrBlank() || EXCLUSION.containsMatchIn(q)) return false
+        fun strip(s: String) = StoryState.tokens(s).filter { it.length >= 4 && it !in COMMON_BIGRAM_WORDS }
+        val qt = strip(q)
+        val an = " " + strip(lastAnswer).joinToString(" ") + " "
+        for (i in 0 until qt.size - 1) {
+            if (an.contains(" " + qt[i] + " " + qt[i + 1] + " ")) return true
+        }
+        return false
+    }
+
+    fun validate(q: String?, state: StoryState, kind: String? = null, lastAnswer: String? = null): List<String> {
         val problems = mutableListOf<String>()
         if (q.isNullOrBlank()) { problems.add("empty"); return problems }
         if (!q.contains("?")) problems.add("not a question")
@@ -32,6 +47,7 @@ object Question {
         if (state.turn >= 1 && META.containsMatchIn(q)) problems.add("meta-question / restatement of the opening")
         if (state.turn >= 1 && GENERIC.containsMatchIn(q)) problems.add("generic 'what stood out' form — name a known detail and ask for something different")
         if (COMPOUND.containsMatchIn(q)) problems.add("compound question — one ask only")
+        if (kind != "consent" && recyclesLastAnswer(q, lastAnswer)) problems.add("reuses the customer's own phrase from their last answer without 'Besides…' exclusion framing — that asks for what they just gave")
         if (state.asked.any { jaccard(it, q) >= 0.45 }) problems.add("near-duplicate of an asked question")
         // Revisiting the same moment in new words: any shared 3-gram with a prior question,
         // computed over stopword-stripped tokens so "the night"/"that night" can't dodge it.
@@ -171,7 +187,8 @@ object Question {
         if (target is Target.Relationship) return Next("Who is ${state.name} to you — how do you two know each other?", null, "identity", "fixed")
         // Consent is too load-bearing for model wording — the code-authored form has never failed an audit.
         if (target is Target.Consent) {
-            val w = target.wound.text.let { if (it.length > 80) it.take(77) + "…" else it }
+            val src = target.wound.verbatim.ifBlank { target.wound.text }
+            val w = if (src.length > 80) src.take(77) + "…" else src
             return Next("You touched on something tender — \"$w\". Would you like the song to hold that part of the story, or steer around it?", null, "consent", "fixed")
         }
         val ctx = buildContext(state, lastAnswer, target)
@@ -181,7 +198,7 @@ object Question {
             val parsed = llm.chatJson(messages, temperature = 0.5)
             val q = parsed?.optString("question")
             if (parsed != null && !q.isNullOrBlank()) {
-                val problems = validate(q, state, kind)
+                val problems = validate(q, state, kind, lastAnswer)
                 if (problems.isEmpty()) {
                     var refl = parsed.optString("reflection").takeIf { it.isNotBlank() && it != "null" }
                     if (refl != null && !reflectionGrounded(refl, lastAnswer)) refl = null

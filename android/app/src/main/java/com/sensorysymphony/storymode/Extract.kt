@@ -56,9 +56,11 @@ object Extract {
             val fa = parsed.optJSONArray("factoids") ?: JSONArray()
             for (j in 0 until fa.length()) {
                 val f = fa.optJSONObject(j) ?: continue
-                val text = f.optString("text"); if (text.isBlank()) continue
-                val verbatim = f.optString("verbatim").ifBlank { text }
+                val rawText = f.optString("text"); if (rawText.isBlank()) continue
+                val verbatim = f.optString("verbatim").ifBlank { rawText }
                 if (!grounded(verbatim, ch)) continue
+                // Paraphrase drift gets replaced by the verbatim — the model files, never rewrites.
+                val text = if (grounded(rawText, ch)) rawText else verbatim
                 val flags = mutableListOf<String>()
                 val fl = f.optJSONArray("flags") ?: JSONArray()
                 for (k in 0 until fl.length()) fl.optString(k)?.let { if (it.isNotBlank()) flags.add(it) }

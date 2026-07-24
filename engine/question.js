@@ -17,7 +17,25 @@ const GENERIC = /\b(stood out|stands? out|notice(d)? most|remember most|makes? (
 // Compound questions smuggle a second ask behind "and".
 const COMPOUND = /\band (why|what|how|when|where|who)\b/i;
 
-function validateQuestion(q, state, kind) {
+const EXCLUSION = /\b(besides|another|one more|something else|anything else|different|other than|new)\b/i;
+const COMMON_BIGRAM_WORDS = new Set(["about", "there", "their", "would", "could", "should", "always", "never", "really", "thing", "things", "something", "someone"]);
+
+// A question that reuses the customer's own distinctive phrase from the answer they
+// just gave — without "besides/another" exclusion framing — is asking for what it was
+// just told, in their own words. The politest possible proof of not listening.
+function recyclesLastAnswer(q, lastAnswer) {
+  if (!lastAnswer) return false;
+  if (EXCLUSION.test(q)) return false;
+  const strip = (s) => S.tokens(s).filter((w) => w.length >= 4 && !COMMON_BIGRAM_WORDS.has(w));
+  const qt = strip(q);
+  const an = " " + strip(lastAnswer).join(" ") + " ";
+  for (let i = 0; i + 1 < qt.length; i++) {
+    if (an.includes(" " + qt[i] + " " + qt[i + 1] + " ")) return true;
+  }
+  return false;
+}
+
+function validateQuestion(q, state, kind, lastAnswer) {
   const problems = [];
   if (!q || typeof q !== "string" || !q.trim()) { problems.push("empty"); return problems; }
   if (!q.includes("?")) problems.push("not a question");
@@ -31,6 +49,7 @@ function validateQuestion(q, state, kind) {
   if (state.turn >= 1 && META.test(q)) problems.push("meta-question / restatement of the opening");
   if (state.turn >= 1 && GENERIC.test(q)) problems.push("generic 'what stood out' form — name a known detail and ask for something different");
   if (COMPOUND.test(q)) problems.push("compound question — one ask only");
+  if (kind !== "consent" && recyclesLastAnswer(q, lastAnswer)) problems.push("reuses the customer's own phrase from their last answer without 'Besides…' exclusion framing — that asks for what they just gave");
   // Near-duplicate of an already-asked question?
   for (const prev of state.asked) {
     if (S.jaccard(prev, q) >= 0.45) { problems.push("near-duplicate of an asked question"); break; }
@@ -185,9 +204,10 @@ async function nextQuestion(model, state, lastAnswer) {
     return { question: `Who is ${state.name} to you — how do you two know each other?`, reflection: null, target: "identity", source: "fixed" };
   }
   // Consent is too load-bearing for model wording: the code-authored form names the
-  // wound plainly and asks the one decision. It has never failed an audit.
+  // wound plainly — in the CUSTOMER'S words — and asks the one decision.
   if (target.kind === "consent") {
-    const w = target.wound.text.length > 80 ? target.wound.text.slice(0, 77) + "…" : target.wound.text;
+    const src = target.wound.verbatim || target.wound.text;
+    const w = src.length > 80 ? src.slice(0, 77) + "…" : src;
     return { question: `You touched on something tender — "${w}". Would you like the song to hold that part of the story, or steer around it?`, reflection: null, target: "consent", source: "fixed" };
   }
   const ctx = buildContext(state, lastAnswer, target);
@@ -198,7 +218,7 @@ async function nextQuestion(model, state, lastAnswer) {
   for (let attempt = 0; attempt < 2; attempt++) {
     const parsed = await chatJson(model, messages, { temperature: 0.5 });
     if (parsed && typeof parsed.question === "string") {
-      const problems = validateQuestion(parsed.question, state, target.kind);
+      const problems = validateQuestion(parsed.question, state, target.kind, lastAnswer);
       if (!problems.length) {
         let reflection = typeof parsed.reflection === "string" ? parsed.reflection.trim() : null;
         if (reflection && !reflectionGrounded(reflection, lastAnswer)) reflection = null;
