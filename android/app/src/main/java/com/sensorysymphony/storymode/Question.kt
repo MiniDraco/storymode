@@ -244,7 +244,7 @@ object Question {
     /** Single most distinctive clause of a factoid — identity clauses and bare names dropped. */
     private fun anchorClause(t: String): String {
         val base = t.trimEnd('.', '!', '?')
-        val clauses = base.split(Regex(",|;| and ", RegexOption.IGNORE_CASE)).map { it.trim() }.filter { it.split(Regex("\\s+")).size >= 2 }
+        val clauses = base.split(Regex(",|;| and ", RegexOption.IGNORE_CASE)).map { it.trim() }.filter { it.split(Regex("\\s+")).size >= 3 }
         val concrete = clauses.filter {
             !Regex("^(my|his|her|their) (wife|husband|dad|father|mom|mother|son|daughter|friend|best friend)\\b", RegexOption.IGNORE_CASE).containsMatchIn(it) &&
                 !Regex("^[A-Z][a-z]+$").matches(it)
@@ -260,7 +260,7 @@ object Question {
             if ((state.fallbackCounts[cat] ?: 0) >= 2) return null
             val anchorCats = if (cat == "scene") listOf("scene", "specific") else listOf(cat, "specific").distinct()
             val anchors = state.factoids
-                .filter { it.category in anchorCats && it.text.split(Regex("\\s+")).size <= 14 }
+                .filter { it.category in anchorCats && it.text.split(Regex("\\s+")).size in 3..14 }
                 .sortedWith(compareByDescending<Factoid> { it.turn }.thenByDescending { it.weight })
             for (a in anchors) {
                 if (!anchorUnused(state, short(a.text))) continue

@@ -277,7 +277,7 @@ function anchorUnused(state, anchorText) {
 // "Karen, my wife, gardens and hums tunes" → "gardens and hums tunes".
 function anchorClause(t) {
   const base = t.replace(/[.!?]+$/, "");
-  const clauses = base.split(/,|;| and /i).map((c) => c.trim()).filter((c) => c.split(/\s+/).length >= 2);
+  const clauses = base.split(/,|;| and /i).map((c) => c.trim()).filter((c) => c.split(/\s+/).length >= 3);
   const concrete = clauses.filter((c) => !/^(my|his|her|their) (wife|husband|dad|father|mom|mother|son|daughter|friend|best friend)\b/i.test(c) && !/^[A-Z][a-z]+$/.test(c));
   const pick = (concrete.length ? concrete : clauses).sort((a, b) => b.length - a.length)[0] || base;
   return pick.length > 60 ? pick.slice(0, 57) + "…" : pick;
@@ -292,7 +292,7 @@ function fallbackFor(state, cat) {
     if ((state.fallbackCounts[cat] || 0) >= 2) return null;
     const anchorCats = cat === "scene" ? ["scene", "specific"] : [cat === "specific" ? "specific" : cat, "specific"];
     const anchors = [...state.factoids]
-      .filter((f) => anchorCats.includes(f.category) && f.text.split(/\s+/).length <= 14)
+      .filter((f) => anchorCats.includes(f.category) && f.text.split(/\s+/).length >= 3 && f.text.split(/\s+/).length <= 14)
       .sort((a, b) => b.turn - a.turn || b.weight - a.weight);
     for (const a of anchors) {
       if (!anchorUnused(state, short(a.text))) continue;

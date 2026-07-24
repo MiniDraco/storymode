@@ -35,6 +35,8 @@ function makeAnswerFn(personaKey, actorModel) {
       if (clean.split(/\s+/).length > p.maxWords + 3) {
         const first = clean.match(/[^.!?]+[.!?]?/);
         clean = (first ? first[0] : clean).split(/\s+/).slice(0, p.maxWords).join(" ");
+        // No truncation orphans — a terse human stops at a complete thought.
+        clean = clean.replace(/[,;]?\s*\b(and|or|of|the|a|an|with|to|for|in|on|at|my|her|his|their|but)\b\s*$/i, "").trim();
       }
     }
     history.push({ role: "assistant", content: clean });
