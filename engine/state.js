@@ -146,18 +146,24 @@ function sortedFactoids(state) {
 // the candidate is CONFIRMED with the customer, never assumed.
 const NAME_STOP = new Set(["The","She","He","They","We","And","But","So","Oh","You","It","My","Her","His","Their","When","What","Like","Just","Every","One","That","This","There","Then","Now","Well","Yeah","Also","Even","Not","All","If","Or","Because","January","February","March","April","May","June","July","August","September","October","November","December","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Christmas","God","Mom","Dad","Ma","Pa","Grandma","Grandpa"]);
 function nameCandidate(state) {
-  const counts = {};
+  const total = {}, strong = {}; // strong = mid-sentence or possessive — real name evidence
   for (const t of state.transcript) {
     for (const sentence of String(t.a).split(/[.!?\n]+/)) {
       const words = sentence.trim().split(/\s+/);
-      for (let i = 1; i < words.length; i++) { // i=1: skip sentence-initial caps
-        const w = words[i].replace(/[^A-Za-z']/g, "");
-        if (/^[A-Z][a-z]{2,}$/.test(w) && !NAME_STOP.has(w)) counts[w] = (counts[w] || 0) + 1;
+      for (let i = 0; i < words.length; i++) {
+        let w = words[i].replace(/[^A-Za-z']/g, "");
+        const possessive = /'s$/.test(w);
+        w = w.replace(/'s$/, "").replace(/'/g, "");
+        if (!/^[A-Z][a-z]{2,}$/.test(w) || NAME_STOP.has(w)) continue;
+        total[w] = (total[w] || 0) + 1;
+        if (i > 0 || possessive) strong[w] = (strong[w] || 0) + 1;
       }
     }
   }
-  const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-  return best && best[1] >= 2 ? best[0] : null;
+  const best = Object.entries(total)
+    .filter(([w, n]) => n >= 2 && (strong[w] || 0) >= 1)
+    .sort((a, b) => b[1] - a[1])[0];
+  return best ? best[0] : null;
 }
 
 // Compact "already known" digest for the question prompt — the anti-re-ask armor.

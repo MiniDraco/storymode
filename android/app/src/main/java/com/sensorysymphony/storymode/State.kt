@@ -132,20 +132,24 @@ class StoryState {
 
         private val NAME_STOP = setOf("The","She","He","They","We","And","But","So","Oh","You","It","My","Her","His","Their","When","What","Like","Just","Every","One","That","This","There","Then","Now","Well","Yeah","Also","Even","Not","All","If","Or","Because","January","February","March","April","May","June","July","August","September","October","November","December","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Christmas","God","Mom","Dad","Ma","Pa","Grandma","Grandpa")
 
-        /** Most frequent mid-sentence capitalized word in the customer's answers — confirmed, never assumed. */
+        /** Most frequent repeated proper noun with mid-sentence/possessive evidence — confirmed, never assumed. */
         fun nameCandidate(state: StoryState): String? {
-            val counts = mutableMapOf<String, Int>()
+            val total = mutableMapOf<String, Int>(); val strong = mutableMapOf<String, Int>()
             for (t in state.transcript) {
                 for (sentence in t.a.split(Regex("[.!?\\n]+"))) {
                     val words = sentence.trim().split(Regex("\\s+"))
-                    for (i in 1 until words.size) {
-                        val w = words[i].replace(Regex("[^A-Za-z']"), "")
-                        if (Regex("^[A-Z][a-z]{2,}$").matches(w) && w !in NAME_STOP) counts[w] = (counts[w] ?: 0) + 1
+                    for (i in words.indices) {
+                        var w = words[i].replace(Regex("[^A-Za-z']"), "")
+                        val possessive = w.endsWith("'s")
+                        w = w.removeSuffix("'s").replace("'", "")
+                        if (!Regex("^[A-Z][a-z]{2,}$").matches(w) || w in NAME_STOP) continue
+                        total[w] = (total[w] ?: 0) + 1
+                        if (i > 0 || possessive) strong[w] = (strong[w] ?: 0) + 1
                     }
                 }
             }
-            val best = counts.entries.maxByOrNull { it.value }
-            return if (best != null && best.value >= 2) best.key else null
+            return total.entries.filter { it.value >= 2 && (strong[it.key] ?: 0) >= 1 }
+                .maxByOrNull { it.value }?.key
         }
 
         fun norm(s: String) = s.lowercase().replace(Regex("[^a-z0-9\\s]"), " ").replace(Regex("\\s+"), " ").trim()

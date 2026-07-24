@@ -172,7 +172,8 @@ async function nextQuestion(model, state, lastAnswer) {
   const target = await pickTarget(model, state);
   if (target.kind === "done") return { question: null, reflection: null, target: null, source: "covered", done: true };
   if (target.kind === "name") {
-    return { question: "What's their name — what do you call them?", reflection: null, target: "identity", source: "fixed" };
+    // Nickname framing: new information even if a formal name is already on the page.
+    return { question: "What do you actually call them, day to day — any nickname the song should know about?", reflection: null, target: "identity", source: "fixed" };
   }
   if (target.kind === "nameConfirm") {
     return { question: `I want the name sung exactly right — the song is about ${target.candidate}, spelled just like that?`, reflection: null, target: "identity", source: "fixed" };

@@ -163,7 +163,7 @@ object Question {
     suspend fun next(llm: LlmBridge, systemPrompt: String, state: StoryState, lastAnswer: String): Next {
         val target = pickTarget(llm, state)
         if (target is Target.Done) return Next(null, null, null, "covered", done = true)
-        if (target is Target.Name) return Next("What's their name — what do you call them?", null, "identity", "fixed")
+        if (target is Target.Name) return Next("What do you actually call them, day to day — any nickname the song should know about?", null, "identity", "fixed")
         if (target is Target.NameConfirm) return Next("I want the name sung exactly right — the song is about ${target.candidate}, spelled just like that?", null, "identity", "fixed")
         if (target is Target.Relationship) return Next("Who is ${state.name} to you — how do you two know each other?", null, "identity", "fixed")
         // Consent is too load-bearing for model wording — the code-authored form has never failed an audit.
