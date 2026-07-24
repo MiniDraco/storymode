@@ -155,8 +155,18 @@ class StoryState {
                     }
                 }
             }
-            return total.entries.filter { it.value >= 2 && (strong[it.key] ?: 0) >= 1 }
+            // One strong occurrence suffices — the candidate is confirmed, never assumed.
+            return total.entries.filter { (strong[it.key] ?: 0) >= 1 }
                 .maxByOrNull { it.value }?.key
+        }
+
+        /** Code-only heal: recategorize plainly-matching factoids into open gaps before target selection. */
+        fun syncHeal(state: StoryState) {
+            for (gapKey in listOf("sound", "job", "identity", "scene")) {
+                if (gapKey !in state.gaps()) continue
+                val hit = state.factoids.firstOrNull { it.category != gapKey && coversGap(gapKey, "${it.text} ${it.verbatim}") }
+                if (hit != null) state.addFactoid(gapKey, hit.text, hit.verbatim, hit.weight, listOf("recategorized"))
+            }
         }
 
         fun norm(s: String) = s.lowercase().replace(Regex("[^a-z0-9\\s]"), " ").replace(Regex("\\s+"), " ").trim()

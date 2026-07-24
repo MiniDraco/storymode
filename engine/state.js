@@ -172,10 +172,22 @@ function nameCandidate(state) {
       }
     }
   }
+  // One mid-sentence/possessive occurrence is enough — the candidate gets CONFIRMED
+  // with the customer, so the cost of a wrong pick is one gentle correction.
   const best = Object.entries(total)
-    .filter(([w, n]) => n >= 2 && (strong[w] || 0) >= 1)
+    .filter(([w]) => (strong[w] || 0) >= 1)
     .sort((a, b) => b[1] - a[1])[0];
   return best ? best[0] : null;
+}
+
+// Code-only heal pass: recategorize plainly-matching factoids into open gaps.
+// Runs before target selection so the heat branch never hunts an already-told scene.
+function syncHeal(state) {
+  for (const gapKey of ["sound", "job", "identity", "scene"]) {
+    if (!gaps(state).includes(gapKey)) continue;
+    const hit = state.factoids.find((f) => f.category !== gapKey && coversGap(gapKey, f.text + " " + (f.verbatim || "")));
+    if (hit) addFactoid(state, { category: gapKey, text: hit.text, verbatim: hit.verbatim, weight: hit.weight, flags: ["recategorized"] });
+  }
 }
 
 // Compact "already known" digest for the question prompt — the anti-re-ask armor.
@@ -195,5 +207,5 @@ module.exports = {
   CATEGORIES, CAT_KEYS, GAP_PRIORITY, HARD_CEILING,
   createState, addFactoid, byCategory, coverage, gaps, readiness,
   sortedFactoids, knownDigest, heatFrom, jaccard, norm, tokens,
-  plausibleCategory, plausibleWound, coversGap, nameCandidate,
+  plausibleCategory, plausibleWound, coversGap, nameCandidate, syncHeal,
 };

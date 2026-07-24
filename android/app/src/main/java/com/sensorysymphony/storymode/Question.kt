@@ -119,6 +119,7 @@ object Question {
     }
 
     suspend fun pickTarget(llm: LlmBridge, state: StoryState): Target {
+        StoryState.syncHeal(state)
         val wound = state.factoids.firstOrNull { "wound" in it.flags }
         if (wound != null && !state.woundConsentAsked) {
             state.woundConsentAsked = true

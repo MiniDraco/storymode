@@ -130,6 +130,8 @@ async function gapAlreadyCovered(model, state, gapKey) {
 
 // Code picks the target; the model only words the question. Deciding is ours, phrasing is theirs.
 async function pickTarget(model, state) {
+  // Clean the gaps list first — an already-told scene/sound/job must not be hunted.
+  S.syncHeal(state);
   // Wound consent comes first, once, when a wound has surfaced.
   const wound = state.factoids.find((f) => f.flags.includes("wound"));
   if (wound && !state.woundConsentAsked) {
