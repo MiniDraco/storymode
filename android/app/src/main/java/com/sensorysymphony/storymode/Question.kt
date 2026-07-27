@@ -133,12 +133,18 @@ object Question {
             state.nameAsked = true
             if (state.modeNameAsk != null) {
                 val phrase = StoryState.nameCandidatePhrase(state)
-                if (phrase != null) { state.name = phrase; return Target.NameConfirm(phrase) }
-                return Target.ModeName
+                if (phrase == null) return Target.ModeName
+                state.name = phrase
+                // Stated identically 2+ times = unambiguous: adopt silently, confirm single sightings.
+                val all = state.transcript.joinToString(" ") { it.a }.lowercase()
+                val count = all.split(phrase.lowercase()).size - 1
+                if (count < 2) return Target.NameConfirm(phrase)
+                // fall through — name settled, pick a real target below
+            } else {
+                val candidate = StoryState.nameCandidate(state)
+                if (candidate != null) { state.name = candidate; return Target.NameConfirm(candidate) }
+                return Target.Name
             }
-            val candidate = StoryState.nameCandidate(state)
-            if (candidate != null) { state.name = candidate; return Target.NameConfirm(candidate) }
-            return Target.Name
         }
         val g = state.gaps()
         val heat = state.heatFrom(state.turn)
@@ -268,7 +274,12 @@ object Question {
         ANCHOR_ASKS[cat]?.let { ask ->
             // At most 2 anchored fallbacks per story-material category — then move on.
             if ((state.fallbackCounts[cat] ?: 0) >= 2) return null
-            val anchorCats = if (cat == "scene") listOf("scene", "specific") else listOf(cat, "specific").distinct()
+            // Sacred sayings and scenes are anchorable specifics.
+            val anchorCats = when (cat) {
+                "scene" -> listOf("scene", "specific", "sacred")
+                "specific" -> listOf("specific", "sacred", "scene")
+                else -> listOf(cat, "specific", "sacred")
+            }
             // Names and spellings are not moments — never anchor on them.
             val anchors = state.factoids
                 .filter { it.category in anchorCats && it.text.split(Regex("\\s+")).size in 3..14 }

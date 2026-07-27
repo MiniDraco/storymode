@@ -147,15 +147,23 @@ async function pickTarget(model, state) {
   if (!state.name && !state.nameAsked && state.turn >= 1 && !S.gaps(state).includes("identity")) {
     state.nameAsked = true;
     if (state.modeDef && state.modeDef.nameAsk) {
-      // Compound-name modes: confirm the phrase candidate when one exists —
-      // confirmation can never be a re-ask; the open ask can.
       const phrase = S.nameCandidatePhrase(state);
-      if (phrase) { state.name = phrase; return { kind: "nameConfirm", candidate: phrase }; }
-      return { kind: "modeName" };
+      if (phrase) {
+        state.name = phrase;
+        // Stated identically 2+ times = unambiguous. Adopt silently; asking at all
+        // reads as not having listened. Confirm only single sightings.
+        const all = state.transcript.map((t) => t.a).join(" ").toLowerCase();
+        const count = all.split(phrase.toLowerCase()).length - 1;
+        if (count < 2) return { kind: "nameConfirm", candidate: phrase };
+        // fall through — name settled, pick a real target below
+      } else {
+        return { kind: "modeName" };
+      }
+    } else {
+      const candidate = S.nameCandidate(state);
+      if (candidate) { state.name = candidate; return { kind: "nameConfirm", candidate }; }
+      return { kind: "name" };
     }
-    const candidate = S.nameCandidate(state);
-    if (candidate) { state.name = candidate; return { kind: "nameConfirm", candidate }; }
-    return { kind: "name" };
   }
   // Follow the heat: a hot thread from the last answer that still serves an open gap.
   const g = S.gaps(state);
@@ -309,7 +317,9 @@ function fallbackFor(state, cat) {
     // At most 2 anchored fallbacks per story-material category — then move on.
     // Hammering one gap the extractor keeps missing is worse than an honest THIN flag.
     if ((state.fallbackCounts[cat] || 0) >= 2) return null;
-    const anchorCats = cat === "scene" ? ["scene", "specific"] : [cat === "specific" ? "specific" : cat, "specific"];
+    // Sacred sayings and scenes are anchorable specifics — a category being technically
+    // empty must not unleash the generic form while real material sits next door.
+    const anchorCats = cat === "scene" ? ["scene", "specific", "sacred"] : cat === "specific" ? ["specific", "sacred", "scene"] : [cat, "specific", "sacred"];
     // Names and spellings are not moments — never anchor on them. And an emotion ask
     // must not anchor on the answer just given: its feeling was usually just stated.
     const anchors = [...state.factoids]
