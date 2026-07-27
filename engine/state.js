@@ -160,8 +160,11 @@ function sortedFactoids(state) {
 // in the customer's own answers. Used only when extraction never flagged a name —
 // the candidate is CONFIRMED with the customer, never assumed.
 const NAME_STOP = new Set(["The","She","He","They","We","And","But","So","Oh","You","It","My","Her","His","Their","When","What","Like","Just","Every","One","That","This","There","Then","Now","Well","Yeah","Also","Even","Not","All","If","Or","Because","January","February","March","April","May","June","July","August","September","October","November","December","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Christmas","God","Mom","Dad","Ma","Pa","Grandma","Grandpa"]);
+const REL_WORDS_RE = /^(wife|husband|dad|father|mom|mother|son|daughter|brother|sister|friend|grandma|grandmother|grandpa|grandfather|aunt|uncle|cousin|partner|boyfriend|girlfriend|boss|mentor|neighbor|coworker)$/i;
+
 function nameCandidate(state) {
-  const total = {}, strong = {}; // strong = mid-sentence or possessive — real name evidence
+  const total = {}, strong = {}, paired = {}; // strong = real name evidence; paired = adjacent to another capital
+  const isCap = (s) => /^[A-Z][a-z]{2,}$/.test(String(s || "").replace(/[^A-Za-z']/g, "").replace(/'s$/, ""));
   for (const t of state.transcript) {
     for (const sentence of String(t.a).split(/[.!?\n]+/)) {
       const words = sentence.trim().split(/\s+/);
@@ -171,13 +174,21 @@ function nameCandidate(state) {
         w = w.replace(/'s$/, "").replace(/'/g, "");
         if (!/^[A-Z][a-z]{2,}$/.test(w) || NAME_STOP.has(w)) continue;
         total[w] = (total[w] || 0) + 1;
+        // Compound proper nouns ("Fleetwood Mac", "Lake Michigan") are not personal names:
+        // track whether this word travels with another capitalized neighbor.
+        if (isCap(words[i - 1]) || isCap(words[i + 1])) paired[w] = (paired[w] || 0) + 1;
         // Strong evidence: mid-sentence, possessive, or a name-introduction
-        // ("Danny was my son" / "Karen is my wife").
-        const intro = /^(was|is)$/i.test((words[i + 1] || "")) && /^my$/i.test((words[i + 2] || ""));
+        // ("Danny was my son" / "Karen is my wife" / "Karen, my wife").
+        const clean1 = String(words[i + 1] || "").replace(/[^A-Za-z]/g, "");
+        const clean2 = String(words[i + 2] || "").replace(/[^A-Za-z]/g, "");
+        const intro = (/^(was|is)$/i.test(clean1) && /^my$/i.test(clean2)) ||
+                      (/^my$/i.test(clean1) && REL_WORDS_RE.test(clean2));
         if (i > 0 || possessive || intro) strong[w] = (strong[w] || 0) + 1;
       }
     }
   }
+  // A word that ONLY ever appears next to another capitalized word is a compound, not a name.
+  for (const w of Object.keys(total)) if ((paired[w] || 0) >= total[w]) delete strong[w];
   // One mid-sentence/possessive occurrence is enough — the candidate gets CONFIRMED
   // with the customer, so the cost of a wrong pick is one gentle correction.
   const best = Object.entries(total)

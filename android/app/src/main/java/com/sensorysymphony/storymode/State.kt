@@ -146,9 +146,12 @@ class StoryState {
 
         private val NAME_STOP = setOf("The","She","He","They","We","And","But","So","Oh","You","It","My","Her","His","Their","When","What","Like","Just","Every","One","That","This","There","Then","Now","Well","Yeah","Also","Even","Not","All","If","Or","Because","January","February","March","April","May","June","July","August","September","October","November","December","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday","Christmas","God","Mom","Dad","Ma","Pa","Grandma","Grandpa")
 
-        /** Most frequent repeated proper noun with mid-sentence/possessive evidence — confirmed, never assumed. */
+        private val REL_WORDS_RE = Regex("^(wife|husband|dad|father|mom|mother|son|daughter|brother|sister|friend|grandma|grandmother|grandpa|grandfather|aunt|uncle|cousin|partner|boyfriend|girlfriend|boss|mentor|neighbor|coworker)$", RegexOption.IGNORE_CASE)
+
+        /** Most frequent repeated proper noun with real name evidence — confirmed, never assumed. */
         fun nameCandidate(state: StoryState): String? {
-            val total = mutableMapOf<String, Int>(); val strong = mutableMapOf<String, Int>()
+            val total = mutableMapOf<String, Int>(); val strong = mutableMapOf<String, Int>(); val paired = mutableMapOf<String, Int>()
+            fun isCap(s: String?) = s != null && Regex("^[A-Z][a-z]{2,}$").matches(s.replace(Regex("[^A-Za-z']"), "").removeSuffix("'s"))
             for (t in state.transcript) {
                 for (sentence in t.a.split(Regex("[.!?\\n]+"))) {
                     val words = sentence.trim().split(Regex("\\s+"))
@@ -158,12 +161,17 @@ class StoryState {
                         w = w.removeSuffix("'s").replace("'", "")
                         if (!Regex("^[A-Z][a-z]{2,}$").matches(w) || w in NAME_STOP) continue
                         total[w] = (total[w] ?: 0) + 1
-                        val intro = (words.getOrNull(i + 1)?.matches(Regex("(?i)was|is")) == true) && (words.getOrNull(i + 2)?.matches(Regex("(?i)my")) == true)
+                        if (isCap(words.getOrNull(i - 1)) || isCap(words.getOrNull(i + 1))) paired[w] = (paired[w] ?: 0) + 1
+                        val c1 = (words.getOrNull(i + 1) ?: "").replace(Regex("[^A-Za-z]"), "")
+                        val c2 = (words.getOrNull(i + 2) ?: "").replace(Regex("[^A-Za-z]"), "")
+                        val intro = (c1.matches(Regex("(?i)was|is")) && c2.matches(Regex("(?i)my"))) ||
+                            (c1.matches(Regex("(?i)my")) && REL_WORDS_RE.matches(c2))
                         if (i > 0 || possessive || intro) strong[w] = (strong[w] ?: 0) + 1
                     }
                 }
             }
-            // One strong occurrence suffices — the candidate is confirmed, never assumed.
+            // A word that ONLY appears next to another capitalized word is a compound, not a name.
+            for (w in total.keys) if ((paired[w] ?: 0) >= (total[w] ?: 0)) strong.remove(w)
             return total.entries.filter { (strong[it.key] ?: 0) >= 1 }
                 .maxByOrNull { it.value }?.key
         }
