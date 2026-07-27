@@ -97,6 +97,14 @@ class InterviewSession(
                 if (cand.isNotEmpty() && cand.split(Regex("\\s+")).size <= 3 && cand.length <= 30) state.name = cand
             }
         }
+        // Half-name upgrade: "Shear" ⊂ "Shear Bliss" in the customer's own words.
+        val nm = state.name
+        if (nm != null && !nm.contains(" ")) {
+            val phrase = StoryState.nameCandidatePhrase(state)
+            if (phrase != null && phrase.length > nm.length && Regex("\\b${Regex.escape(nm)}\\b", RegexOption.IGNORE_CASE).containsMatchIn(phrase)) {
+                state.name = phrase
+            }
+        }
         save()
 
         val (stop, _) = state.readiness()

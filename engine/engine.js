@@ -44,6 +44,14 @@ async function runInterview(model, answerFn, log = () => {}, modeKey = "person")
         if (cand && cand.split(/\s+/).length <= 3 && cand.length <= 30) state.name = cand;
       }
     }
+    // A single-word name that sits inside a longer proper-noun phrase in the customer's
+    // own words is half a name ("Shear" ⊂ "Shear Bliss") — upgrade to the phrase.
+    if (state.name && !state.name.includes(" ")) {
+      const phrase = S.nameCandidatePhrase(state);
+      if (phrase && phrase.length > state.name.length && new RegExp(`\\b${state.name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(phrase)) {
+        state.name = phrase;
+      }
+    }
     log(`  extracted ${factoids.length} factoids; total ${state.factoids.length}; gaps: ${S.gaps(state).join(",") || "none"}`);
 
     const ready = S.readiness(state);
