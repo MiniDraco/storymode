@@ -62,11 +62,9 @@ class MainActivity : AppCompatActivity() {
             dossierText?.let { share(it) }
         }
         findViewById<Button>(R.id.newInterview).setOnClickListener {
-            val s = session ?: return@setOnClickListener
-            s.reset()
-            finishGroup.visibility = View.GONE
-            findViewById<View>(R.id.interviewGroup).visibility = View.VISIBLE
-            showQuestion(null, s.opening)
+            session?.reset()
+            session = null
+            showArrival()
         }
     }
 
@@ -92,14 +90,61 @@ class MainActivity : AppCompatActivity() {
         showSetup()
     }
 
+    private var currentBridge: LlmBridge? = null
+
     private fun startSession(bridge: LlmBridge) {
+        currentBridge = bridge
+        val probe = InterviewSession(this, bridge)
+        if (probe.resumeIfPresent()) {
+            session = probe
+            showInterview()
+            showQuestion(probe.currentReflection, probe.currentQuestion)
+            toast("Welcome back — picking up right where you left off.")
+            return
+        }
+        showArrival()
+    }
+
+    /** Arrival = the anticipation beat + the one fork: who is this song for? */
+    private fun showArrival() {
         findViewById<View>(R.id.setupGroup).visibility = View.GONE
-        findViewById<View>(R.id.interviewGroup).visibility = View.VISIBLE
-        val s = InterviewSession(this, bridge)
+        findViewById<View>(R.id.interviewGroup).visibility = View.GONE
+        finishGroup.visibility = View.GONE
+        findViewById<View>(R.id.arrivalGroup).visibility = View.VISIBLE
+        val container = findViewById<android.widget.LinearLayout>(R.id.arrivalButtons)
+        if (container.childCount > 0) return
+        val modes = org.json.JSONObject(assets.open("modes.json").bufferedReader().readText())
+        for (key in modes.keys()) {
+            val m = modes.getJSONObject(key)
+            val b = Button(this).apply {
+                text = m.optString("label", key)
+                textSize = 16f
+                isAllCaps = false
+                setTextColor(android.graphics.Color.parseColor("#EFE6D4"))
+                backgroundTintList = android.content.res.ColorStateList.valueOf(android.graphics.Color.parseColor("#221C15"))
+                setOnClickListener { beginMode(key) }
+            }
+            val lp = android.widget.LinearLayout.LayoutParams(
+                android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = 10 }
+            container.addView(b, lp)
+        }
+    }
+
+    private fun beginMode(modeKey: String) {
+        val bridge = currentBridge ?: return
+        val s = InterviewSession(this, bridge, modeKey)
         session = s
-        val resumed = s.resumeIfPresent()
-        showQuestion(s.currentReflection, s.currentQuestion)
-        if (resumed) toast("Welcome back — picking up right where you left off.")
+        showInterview()
+        showQuestion(null, s.opening)
+    }
+
+    private fun showInterview() {
+        findViewById<View>(R.id.setupGroup).visibility = View.GONE
+        findViewById<View>(R.id.arrivalGroup).visibility = View.GONE
+        finishGroup.visibility = View.GONE
+        findViewById<View>(R.id.interviewGroup).visibility = View.VISIBLE
     }
 
     private fun showSetup() {

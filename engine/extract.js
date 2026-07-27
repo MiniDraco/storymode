@@ -51,14 +51,15 @@ function grounded(verbatim, source) {
   return hits / vt.length >= 0.8;
 }
 
-async function extractFromAnswer(model, question, answer, onProgress) {
+async function extractFromAnswer(model, question, answer, onProgress, lens = "") {
   const chunks = chunk(answer);
   const out = [];
+  const system = lens ? PROMPT + "\n\nLENS FOR THIS INTERVIEW:\n" + lens : PROMPT;
   for (let i = 0; i < chunks.length; i++) {
     if (onProgress) onProgress(i + 1, chunks.length);
     const user = `INTERVIEW QUESTION THAT PROMPTED THIS:\n${question}\n\nCUSTOMER'S WORDS:\n${chunks[i]}`;
     const parsed = await chatJson(model, [
-      { role: "system", content: PROMPT },
+      { role: "system", content: system },
       { role: "user", content: user },
     ], { temperature: 0.2 });
     if (!parsed || !Array.isArray(parsed.factoids)) continue;

@@ -22,8 +22,10 @@ async function main() {
   const t0 = Date.now();
   console.log(`persona=${personaKey} interviewer=${INTERVIEWER} actor=${ACTOR} judge=${JUDGE}`);
 
+  const { PERSONAS } = require("./persona");
+  const mode = PERSONAS[personaKey].mode || "person";
   const answerFn = makeAnswerFn(personaKey, ACTOR);
-  const result = await runInterview(INTERVIEWER, answerFn, (m) => console.log(m));
+  const result = await runInterview(INTERVIEWER, answerFn, (m) => console.log(m), mode);
 
   let audit = null;
   if (!NO_JUDGE) {

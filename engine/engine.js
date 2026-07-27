@@ -10,17 +10,22 @@ const { nextQuestion } = require("./question");
 const { renderHandoff, renderDossier, renderFinish } = require("./compile");
 
 const OPENING = fs.readFileSync(path.join(__dirname, "..", "prompts", "opening.txt"), "utf8").trim();
+const MODES = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "prompts", "modes.json"), "utf8"));
 
 /**
  * Run a full interview.
  * @param {string} model - the small model id (what ships in the APK)
  * @param {(question: string, reflection: string|null) => Promise<string>} answerFn - the customer
  * @param {(msg: string) => void} [log]
+ * @param {string} [modeKey] - which door the customer came through (prompts/modes.json)
  */
-async function runInterview(model, answerFn, log = () => {}) {
+async function runInterview(model, answerFn, log = () => {}, modeKey = "person") {
   const state = S.createState();
-  let question = OPENING;
+  state.mode = MODES[modeKey] ? modeKey : "person";
+  state.modeDef = MODES[state.mode];
+  let question = state.modeDef.opening || OPENING;
   let reflection = null;
+  log(`mode: ${state.mode}`);
 
   while (true) {
     state.turn++;
@@ -30,7 +35,7 @@ async function runInterview(model, answerFn, log = () => {}) {
     log(`A${state.turn}: ${answer.slice(0, 120).replace(/\n/g, " ")}${answer.length > 120 ? "…" : ""}`);
     state.transcript.push({ q: question, a: answer, turn: state.turn, ts: Date.now() });
 
-    const factoids = await extractFromAnswer(model, question, answer);
+    const factoids = await extractFromAnswer(model, question, answer, null, state.modeDef.lens || "");
     for (const f of factoids) {
       const rec = S.addFactoid(state, f);
       if (rec && rec.flags.includes("name") && !state.name) {
@@ -70,4 +75,4 @@ async function runInterview(model, answerFn, log = () => {}) {
   };
 }
 
-module.exports = { runInterview, OPENING };
+module.exports = { runInterview, OPENING, MODES };

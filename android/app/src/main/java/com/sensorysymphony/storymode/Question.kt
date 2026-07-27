@@ -89,6 +89,7 @@ object Question {
         data class Gap(val target: String) : Target()
         object Name : Target()
         data class NameConfirm(val candidate: String) : Target()
+        object ModeName : Target()
         object Relationship : Target()
         object Done : Target()
     }
@@ -129,6 +130,11 @@ object Question {
         // never be a re-ask) — or ask plainly if there is none.
         if (state.name == null && !state.nameAsked && state.turn >= 1 && "identity" !in state.gaps()) {
             state.nameAsked = true
+            if (state.modeNameAsk != null) {
+                val phrase = StoryState.nameCandidatePhrase(state)
+                if (phrase != null) { state.name = phrase; return Target.NameConfirm(phrase) }
+                return Target.ModeName
+            }
             val candidate = StoryState.nameCandidate(state)
             if (candidate != null) { state.name = candidate; return Target.NameConfirm(candidate) }
             return Target.Name
@@ -157,12 +163,14 @@ object Question {
         return Target.Done
     }
 
+    private fun catLabel(state: StoryState, cat: String) = state.modeLabels[cat] ?: CATEGORIES[cat]?.label ?: cat
+
     private fun buildContext(state: StoryState, lastAnswer: String, target: Target): String {
         val heat = state.heatFrom(state.turn)
         val targetLine = when (target) {
             is Target.Consent -> "TARGET: something painful surfaced — \"${target.wound.text}\". Name it plainly and gently, and ask whether the song should hold it or steer around it. That is the entire question."
             is Target.Heat -> "TARGET: go deeper into this thread from their last answer: \"${target.thread.text}\". Ask for the ${if (target.target == "scene") "specific moment — what happened" else "feeling inside it"}."
-            is Target.Gap -> "TARGET: ${target.target} — ${CATEGORIES[target.target]?.label}. Your question must pursue exactly this and nothing else. Anchor it in a detail from KNOWN when natural."
+            is Target.Gap -> "TARGET: ${target.target} — ${catLabel(state, target.target)}. Your question must pursue exactly this and nothing else. Anchor it in a detail from KNOWN when natural."
             else -> ""
         }
         return listOf(
@@ -189,6 +197,7 @@ object Question {
         if (target is Target.Done) return Next(null, null, null, "covered", done = true)
         if (target is Target.Name) return Next("What do you actually call them, day to day — any nickname the song should know about?", null, "identity", "fixed")
         if (target is Target.NameConfirm) return Next("I want the name sung exactly right — the song is about ${target.candidate}, spelled just like that?", null, "identity", "fixed")
+        if (target is Target.ModeName) return Next(state.modeNameAsk!!, null, "identity", "fixed")
         if (target is Target.Relationship) return Next("Who is ${state.name} to you — how do you two know each other?", null, "identity", "fixed")
         // Consent is too load-bearing for model wording — the code-authored form has never failed an audit.
         if (target is Target.Consent) {
@@ -227,8 +236,8 @@ object Question {
 
     // Anchored, dedupe-aware fallbacks: anchors rotate newest-first; near-repeats are skipped.
     private val ANCHOR_ASKS: Map<String, (String) -> String> = mapOf(
-        "specific" to { a -> "Besides $a — what's one more thing about them almost nobody else does?" },
-        "scene" to { a -> "Besides $a — tell me about one more moment with them that stays with you?" },
+        "specific" to { a -> "Besides $a — what's one more thing almost nobody else would know?" },
+        "scene" to { a -> "Besides $a — tell me about one more moment that stays with you?" },
         "emotion" to { a -> "When you think about $a — what's the feeling underneath it?" },
     )
 
@@ -259,8 +268,10 @@ object Question {
             // At most 2 anchored fallbacks per story-material category — then move on.
             if ((state.fallbackCounts[cat] ?: 0) >= 2) return null
             val anchorCats = if (cat == "scene") listOf("scene", "specific") else listOf(cat, "specific").distinct()
+            // Names and spellings are not moments — never anchor on them.
             val anchors = state.factoids
                 .filter { it.category in anchorCats && it.text.split(Regex("\\s+")).size in 3..14 }
+                .filter { "name" !in it.flags && "spelling" !in it.flags && !Regex("\\bspelled\\b|\\b(?:[A-Za-z]-){2,}[A-Za-z]\\b", RegexOption.IGNORE_CASE).containsMatchIn(it.text) }
                 .sortedWith(compareByDescending<Factoid> { it.turn }.thenByDescending { it.weight })
             for (a in anchors) {
                 if (!anchorUnused(state, short(a.text))) continue

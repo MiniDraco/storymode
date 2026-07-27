@@ -2,7 +2,13 @@
 // On the APK this file is replaced by a llama.cpp/MediaPipe binding with the same signature.
 "use strict";
 
-const HOST = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
+// OLLAMA_HOST may be a bare bind address like "0.0.0.0:11434" (server-side notation) —
+// normalize to a connectable client URL.
+const HOST = (() => {
+  let h = process.env.OLLAMA_HOST || "http://127.0.0.1:11434";
+  if (!/^https?:\/\//.test(h)) h = "http://" + h;
+  return h.replace("0.0.0.0", "127.0.0.1").replace(/\/$/, "");
+})();
 
 async function chat(model, messages, opts = {}) {
   const body = {

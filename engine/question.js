@@ -140,8 +140,17 @@ async function pickTarget(model, state) {
   }
   // A song needs the name. If extraction never flagged one, confirm the transcript's
   // best candidate (confirmation can never be a re-ask) — or ask plainly if there is none.
+  // Modes with their own name question (business, wedding, self) use it directly:
+  // single-word candidate confirmation makes no sense for "Shear Bliss" or a couple.
   if (!state.name && !state.nameAsked && state.turn >= 1 && !S.gaps(state).includes("identity")) {
     state.nameAsked = true;
+    if (state.modeDef && state.modeDef.nameAsk) {
+      // Compound-name modes: confirm the phrase candidate when one exists —
+      // confirmation can never be a re-ask; the open ask can.
+      const phrase = S.nameCandidatePhrase(state);
+      if (phrase) { state.name = phrase; return { kind: "nameConfirm", candidate: phrase }; }
+      return { kind: "modeName" };
+    }
     const candidate = S.nameCandidate(state);
     if (candidate) { state.name = candidate; return { kind: "nameConfirm", candidate }; }
     return { kind: "name" };
@@ -172,6 +181,10 @@ async function pickTarget(model, state) {
   return { kind: "done" };
 }
 
+function catLabel(state, cat) {
+  return (state.modeDef && state.modeDef.labels && state.modeDef.labels[cat]) || S.CATEGORIES[cat].label;
+}
+
 function buildContext(state, lastAnswer, target) {
   const heat = S.heatFrom(state, state.turn);
   const targetLine =
@@ -179,7 +192,7 @@ function buildContext(state, lastAnswer, target) {
       ? `TARGET: something painful surfaced — "${target.wound.text}". Name it plainly and gently, and ask whether the song should hold it or steer around it. That is the entire question.`
       : target.kind === "heat"
         ? `TARGET: go deeper into this thread from their last answer: "${target.thread.text}". Ask for the ${target.target === "scene" ? "specific moment — what happened" : "feeling inside it"}.`
-        : `TARGET: ${target.target} — ${S.CATEGORIES[target.target].label}. Your question must pursue exactly this and nothing else. Anchor it in a detail from KNOWN when natural.`;
+        : `TARGET: ${target.target} — ${catLabel(state, target.target)}. Your question must pursue exactly this and nothing else. Anchor it in a detail from KNOWN when natural.`;
   return [
     "KNOWN (never ask about any of this):",
     S.knownDigest(state, 120) || "- nothing yet",
@@ -204,6 +217,9 @@ async function nextQuestion(model, state, lastAnswer) {
     // Nickname framing: new information even if a formal name is already on the page.
     return { question: "What do you actually call them, day to day — any nickname the song should know about?", reflection: null, target: "identity", source: "fixed" };
   }
+  if (target.kind === "modeName") {
+    return { question: state.modeDef.nameAsk, reflection: null, target: "identity", source: "fixed" };
+  }
   if (target.kind === "nameConfirm") {
     return { question: `I want the name sung exactly right — the song is about ${target.candidate}, spelled just like that?`, reflection: null, target: "identity", source: "fixed" };
   }
@@ -218,8 +234,9 @@ async function nextQuestion(model, state, lastAnswer) {
     return { question: `You touched on something tender — "${w}". Would you like the song to hold that part of the story, or steer around it?`, reflection: null, target: "consent", source: "fixed" };
   }
   const ctx = buildContext(state, lastAnswer, target);
+  const system = state.modeDef && state.modeDef.lens ? PROMPT + "\n\nLENS FOR THIS INTERVIEW:\n" + state.modeDef.lens : PROMPT;
   let messages = [
-    { role: "system", content: PROMPT },
+    { role: "system", content: system },
     { role: "user", content: ctx },
   ];
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -256,8 +273,8 @@ async function nextQuestion(model, state, lastAnswer) {
 // Anchored, dedupe-aware fallbacks. Anchors rotate newest-first so a repeat ask is
 // impossible by construction; a question too close to anything already asked is skipped.
 const ANCHOR_ASKS = {
-  specific: (a) => `Besides ${a} — what's one more thing about them almost nobody else does?`,
-  scene: (a) => `Besides ${a} — tell me about one more moment with them that stays with you?`,
+  specific: (a) => `Besides ${a} — what's one more thing almost nobody else would know?`,
+  scene: (a) => `Besides ${a} — tell me about one more moment that stays with you?`,
   emotion: (a) => `When you think about ${a} — what's the feeling underneath it?`,
 };
 
@@ -291,8 +308,10 @@ function fallbackFor(state, cat) {
     // Hammering one gap the extractor keeps missing is worse than an honest THIN flag.
     if ((state.fallbackCounts[cat] || 0) >= 2) return null;
     const anchorCats = cat === "scene" ? ["scene", "specific"] : [cat === "specific" ? "specific" : cat, "specific"];
+    // Names and spellings are not moments — never anchor on them.
     const anchors = [...state.factoids]
       .filter((f) => anchorCats.includes(f.category) && f.text.split(/\s+/).length >= 3 && f.text.split(/\s+/).length <= 14)
+      .filter((f) => !f.flags.includes("name") && !f.flags.includes("spelling") && !/\bspelled\b|\b(?:[A-Za-z]-){2,}[A-Za-z]\b/i.test(f.text))
       .sort((a, b) => b.turn - a.turn || b.weight - a.weight);
     for (const a of anchors) {
       if (!anchorUnused(state, short(a.text))) continue;

@@ -1,0 +1,57 @@
+{
+  "person": {
+    "label": "Someone I love",
+    "opening": "Tell me about them — the way you'd describe them to someone who's never met them. Anything that comes to mind. There's no wrong way to start.",
+    "lens": "",
+    "labels": {}
+  },
+  "memorial": {
+    "label": "Someone we've lost",
+    "opening": "Tell me about them — who they were, the way you'd want someone who never got to meet them to know them. Take all the time you need.",
+    "lens": "THIS IS A MEMORIAL SONG. The subject has passed away. Pace gently — never chirpy, never rushed. Grief is expected material, not a wound to flag on sight; the wound-consent question still matters for the rawest details. Never use past tense as if correcting the customer; follow their lead on tense.",
+    "labels": {
+      "scene": "A memory with a beginning, middle, end — a moment that brings them back",
+      "emotion": "What they meant, and what their absence means",
+      "job": "Where and when the song will be heard (memorial, anniversary, quiet listening)"
+    }
+  },
+  "wedding": {
+    "label": "A wedding",
+    "opening": "Tell me about the two of you — how you'd describe this couple to someone who's never met either of you. Start anywhere.",
+    "lens": "THIS IS A WEDDING SONG. The subject is a COUPLE and their story together. Both names matter. Seek the story of how they found each other, what makes the two of them unmistakable together, and the moment at the wedding when the song plays. In the extraction JSON, set \"name\" to the couple as a pair, e.g. \"Jaz and Marcus\".",
+    "labels": {
+      "identity": "The couple (both names, who they are to the customer)",
+      "specific": "Unmistakable particulars of the two of them together (rituals, sayings, the story of how they met)",
+      "scene": "A moment that tells their story — how they met, a turning point, a promise",
+      "job": "The wedding moment this song owns (first dance, ceremony, reception)"
+    },
+    "nameAsk": "I want both names sung exactly right — whose wedding is this, spelled just as it should be sung?"
+  },
+  "self": {
+    "label": "A song for myself",
+    "opening": "Tell me about you — this chapter of your life, the way you'd tell it to someone who really listens. There's no wrong way to start.",
+    "lens": "THE CUSTOMER IS THE SUBJECT. They are buying this song for themselves. Never ask about 'them' — ask about the customer directly, warmly, without therapy-speak. The song's job might be celebration, closure, motivation, or a marker of a chapter. In the extraction JSON, set \"name\" to the customer's own name if they give it.",
+    "labels": {
+      "identity": "Who they are (name + how they want to be sung about)",
+      "specific": "Unmistakable particulars of their life (habits, sayings, places, rituals)",
+      "scene": "A moment from their story concrete enough to carry a verse",
+      "emotion": "The feeling this chapter of life carries, and any tension inside it",
+      "job": "What this song is for in their life (when they'll play it, what it should do)"
+    },
+    "nameAsk": "What's your name — exactly the way you'd want it sung, if it appears at all?"
+  },
+  "business": {
+    "label": "A business or brand",
+    "opening": "Tell me about the business — what it is, what it does, and what walking in feels like for a customer who loves the place.",
+    "lens": "THE SUBJECT IS A BUSINESS. Never ask relationship or family questions. The 'specifics' are what regulars know: rituals, sayings, the founder's story, the thing no competitor has. The 'emotional center' is what customers FEEL there — the transformation, not marketing slogans. Ban slogan-speak entirely. In the extraction JSON, set \"name\" to the BUSINESS's name exactly as the customer gives it.",
+    "labels": {
+      "identity": "The business (name + what it is)",
+      "specific": "What regulars know that outsiders don't (rituals, sayings, the founder's story, details)",
+      "scene": "A story that captures the business at its best — a real customer moment",
+      "emotion": "What customers feel there — the transformation the place delivers",
+      "job": "Where the song works (in the shop, ads, events, on hold)",
+      "boundary": "What must NOT appear (competitors, slogans, anything off-brand)"
+    },
+    "nameAsk": "What's the business's name — exactly as it should be sung?"
+  }
+}

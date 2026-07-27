@@ -43,6 +43,10 @@ class StoryState {
     var thin = listOf<String>()
     var woundConsentAsked = false
     var nameAsked = false
+    var mode = "person"
+    var modeLens = ""
+    var modeLabels: Map<String, String> = emptyMap()
+    var modeNameAsk: String? = null
     val fallbackCounts = mutableMapOf<String, Int>()
     private var nextId = 0
 
@@ -104,6 +108,7 @@ class StoryState {
     // ---- persistence (nothing gets lost, ever) ----
     fun toJson(): JSONObject = JSONObject().apply {
         put("turn", turn); put("name", name ?: JSONObject.NULL); put("done", done)
+        put("mode", mode); put("nameAsked", nameAsked)
         put("woundConsentAsked", woundConsentAsked); put("nextId", nextId)
         put("thin", JSONArray(thin)); put("asked", JSONArray(asked))
         put("factoids", JSONArray().apply { factoids.forEach { f -> put(JSONObject().apply {
@@ -160,6 +165,24 @@ class StoryState {
                 .maxByOrNull { it.value }?.key
         }
 
+        /** Multi-word proper-noun candidate ("Shear Bliss") — adjacent capitalized words as a phrase. */
+        fun nameCandidatePhrase(state: StoryState): String? {
+            val counts = mutableMapOf<String, Int>()
+            for (t in state.transcript) {
+                for (sentence in t.a.split(Regex("[.!?\\n]+"))) {
+                    val words = sentence.trim().split(Regex("\\s+")).map { it.replace(Regex("[^A-Za-z']"), "").removeSuffix("'s") }
+                    for (i in 0 until words.size - 1) {
+                        val a = words[i]; val b = words[i + 1]
+                        if (Regex("^[A-Z][a-z]{2,}$").matches(a) && Regex("^[A-Z][a-z]{2,}$").matches(b) && a !in NAME_STOP && b !in NAME_STOP) {
+                            val k = "$a $b"
+                            counts[k] = (counts[k] ?: 0) + 1
+                        }
+                    }
+                }
+            }
+            return counts.entries.maxByOrNull { it.value }?.key ?: nameCandidate(state)
+        }
+
         /** Code-only heal: recategorize plainly-matching factoids into open gaps before target selection. */
         fun syncHeal(state: StoryState) {
             for (gapKey in listOf("sound", "job", "identity", "scene")) {
@@ -182,6 +205,7 @@ class StoryState {
             val s = StoryState()
             s.turn = o.optInt("turn"); s.name = o.optString("name").takeIf { it.isNotBlank() && it != "null" }
             s.done = o.optBoolean("done"); s.woundConsentAsked = o.optBoolean("woundConsentAsked")
+            s.mode = o.optString("mode").ifBlank { "person" }; s.nameAsked = o.optBoolean("nameAsked")
             val fa = o.optJSONArray("factoids") ?: JSONArray()
             for (i in 0 until fa.length()) {
                 val f = fa.getJSONObject(i)

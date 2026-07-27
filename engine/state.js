@@ -180,6 +180,27 @@ function nameCandidate(state) {
   return best ? best[0] : null;
 }
 
+// Multi-word proper-noun candidate ("Shear Bliss", "Jazmin and Marcus" reduced to pairs):
+// adjacent capitalized words counted as a phrase. Used by modes whose subject has a
+// compound name; falls back to the single-word candidate.
+function nameCandidatePhrase(state) {
+  const counts = {};
+  for (const t of state.transcript) {
+    for (const sentence of String(t.a).split(/[.!?\n]+/)) {
+      const words = sentence.trim().split(/\s+/).map((w) => w.replace(/[^A-Za-z']/g, "").replace(/'s$/, ""));
+      for (let i = 0; i + 1 < words.length; i++) {
+        const a = words[i], b = words[i + 1];
+        if (/^[A-Z][a-z]{2,}$/.test(a) && /^[A-Z][a-z]{2,}$/.test(b) && !NAME_STOP.has(a) && !NAME_STOP.has(b)) {
+          const k = a + " " + b;
+          counts[k] = (counts[k] || 0) + 1;
+        }
+      }
+    }
+  }
+  const best = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  return best ? best[0] : nameCandidate(state);
+}
+
 // Code-only heal pass: recategorize plainly-matching factoids into open gaps.
 // Runs before target selection so the heat branch never hunts an already-told scene.
 function syncHeal(state) {
@@ -207,5 +228,5 @@ module.exports = {
   CATEGORIES, CAT_KEYS, GAP_PRIORITY, HARD_CEILING,
   createState, addFactoid, byCategory, coverage, gaps, readiness,
   sortedFactoids, knownDigest, heatFrom, jaccard, norm, tokens,
-  plausibleCategory, plausibleWound, coversGap, nameCandidate, syncHeal,
+  plausibleCategory, plausibleWound, coversGap, nameCandidate, nameCandidatePhrase, syncHeal,
 };

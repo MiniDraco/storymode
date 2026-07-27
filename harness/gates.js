@@ -7,7 +7,7 @@ const fs = require("fs");
 const path = require("path");
 
 const MODEL = process.argv[2] || "qwen2.5:3b";
-const PERSONAS = ["chapters_writer", "terse_dad", "messy_typist", "grieving_mother"];
+const PERSONAS = ["chapters_writer", "terse_dad", "messy_typist", "grieving_mother", "business_owner"];
 
 const results = [];
 for (const p of PERSONAS) {

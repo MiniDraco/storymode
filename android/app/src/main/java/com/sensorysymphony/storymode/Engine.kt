@@ -8,18 +8,42 @@ import java.io.File
 class InterviewSession(
     private val context: Context,
     private val llm: LlmBridge,
+    modeKey: String = "person",
 ) {
-    val extractPrompt = asset("extract.txt")
-    val questionPrompt = asset("question.txt")
-    val opening = asset("opening.txt").trim()
+    val extractPrompt0 = asset("extract.txt")
+    val questionPrompt0 = asset("question.txt")
+    val opening0 = asset("opening.txt").trim()
     val handoffTemplate = asset("handoff.md")
+    private val modes = JSONObject(asset("modes.json"))
 
     var state = StoryState()
         private set
-    var currentQuestion: String = opening
+    var opening: String = opening0
+        private set
+    var currentQuestion: String
         private set
     var currentReflection: String? = null
         private set
+
+    init {
+        applyMode(if (modes.has(modeKey)) modeKey else "person")
+        currentQuestion = opening
+    }
+
+    private fun applyMode(key: String) {
+        val k = if (modes.has(key)) key else "person"
+        val m = modes.getJSONObject(k)
+        state.mode = k
+        state.modeLens = m.optString("lens")
+        state.modeNameAsk = m.optString("nameAsk").takeIf { it.isNotBlank() }
+        val labels = mutableMapOf<String, String>()
+        m.optJSONObject("labels")?.let { lo -> lo.keys().forEach { kk -> labels[kk] = lo.getString(kk) } }
+        state.modeLabels = labels
+        opening = m.optString("opening").ifBlank { opening0 }
+    }
+
+    val extractPrompt get() = if (state.modeLens.isBlank()) extractPrompt0 else extractPrompt0 + "\n\nLENS FOR THIS INTERVIEW:\n" + state.modeLens
+    val questionPrompt get() = if (state.modeLens.isBlank()) questionPrompt0 else questionPrompt0 + "\n\nLENS FOR THIS INTERVIEW:\n" + state.modeLens
 
     private fun asset(name: String) = context.assets.open(name).bufferedReader().readText()
     private val saveFile get() = File(context.filesDir, "session.json")
@@ -34,6 +58,7 @@ class InterviewSession(
         return try {
             val o = JSONObject(saveFile.readText())
             state = StoryState.fromJson(o.getJSONObject("state"))
+            applyMode(state.mode) // lens/labels/nameAsk are derived, not persisted
             currentQuestion = o.optString("currentQuestion", opening)
             currentReflection = o.optString("currentReflection").takeIf { it.isNotBlank() && it != "null" }
             !state.done
