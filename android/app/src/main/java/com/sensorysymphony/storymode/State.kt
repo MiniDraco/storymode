@@ -129,7 +129,7 @@ class StoryState {
             "job" -> JOB_RE.containsMatchIn(text)
             else -> true
         }
-        private val SCENE_RE = Regex("\\b(the (night|day|morning|afternoon|evening|summer|winter|spring|fall|year|time|moment) (of|when|she|he|we|i|before|after)|one (night|day|time|morning)|that (night|day|morning|time)|when (he|she|we|i|they) \\w+|there was (a|this|one)|i remember (the|when|that))\\b", RegexOption.IGNORE_CASE)
+        private val SCENE_RE = Regex("\\b(the (night|day|morning|afternoon|evening|summer|winter|spring|fall|year|time|moment) (of|when|she|he|we|i|before|after)|one (night|day|time|morning)|that (night|day|morning|time)|when (he|she|we|i|they|my|our|his|her|their) \\w+|there was (a|this|one)|i remember (the|when|that)|\\bonce\\b|the time (he|she|they|we|i)|\\bshowed up\\b|\\bdrove \\w+ (hours?|miles?|to)\\b)", RegexOption.IGNORE_CASE)
         private val EMOTION_RE = Regex("\\b(feel|feels|felt|feeling|love[ds]?|loving|joy|joyful|smile[ds]?|laugh\\w* (made|makes|brought|brings)|warmth|warms?( my)? heart|proud|pride|grateful|gratitude|miss(es|ed)? (him|her|them)|happy|happiness|comfort\\w*|peace(ful)?|bittersweet|heart (aches?|swells?|full))\\b", RegexOption.IGNORE_CASE)
         fun coversGap(cat: String, text: String): Boolean = when (cat) {
             "sound" -> SOUND_RE.containsMatchIn(text)

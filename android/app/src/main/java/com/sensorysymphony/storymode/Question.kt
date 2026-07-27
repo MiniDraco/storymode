@@ -172,12 +172,26 @@ object Question {
 
     private fun catLabel(state: StoryState, cat: String) = state.modeLabels[cat] ?: CATEGORIES[cat]?.label ?: cat
 
+    /** When story material already exists in this territory, force exclusion framing. */
+    private fun gapTargetLine(state: StoryState, cat: String): String {
+        val base = "TARGET: $cat — ${catLabel(state, cat)}. Your question must pursue exactly this and nothing else."
+        if (cat !in listOf("specific", "scene", "emotion")) return "$base Anchor it in a detail from KNOWN when natural."
+        val territory = state.sortedFactoids()
+            .filter { it.category in listOf("specific", "scene", "sacred", "emotion") && it.text.split(Regex("\\s+")).size >= 3 }
+            .take(3)
+        if (territory.isEmpty()) return "$base Anchor it in a detail from KNOWN when natural."
+        return base +
+            "\nTHEY ALREADY GAVE THIS IN THIS TERRITORY:\n" +
+            territory.joinToString("\n") { "- ${it.text}" } +
+            "\nYour question MUST begin by naming one of those and asking for something DIFFERENT — start with \"Besides …\" or \"Other than …\". A generic ask (\"tell me about a time\", \"what's something special\") re-asks what they already gave and is an automatic failure."
+    }
+
     private fun buildContext(state: StoryState, lastAnswer: String, target: Target): String {
         val heat = state.heatFrom(state.turn)
         val targetLine = when (target) {
             is Target.Consent -> "TARGET: something painful surfaced — \"${target.wound.text}\". Name it plainly and gently, and ask whether the song should hold it or steer around it. That is the entire question."
             is Target.Heat -> "TARGET: go deeper into this thread from their last answer: \"${target.thread.text}\". Ask for the ${if (target.target == "scene") "specific moment — what happened" else "feeling inside it"}."
-            is Target.Gap -> "TARGET: ${target.target} — ${catLabel(state, target.target)}. Your question must pursue exactly this and nothing else. Anchor it in a detail from KNOWN when natural."
+            is Target.Gap -> gapTargetLine(state, target.target)
             else -> ""
         }
         return listOf(

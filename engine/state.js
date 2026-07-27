@@ -61,7 +61,7 @@ function plausibleCategory(cat, text) {
   return true;
 }
 // Scene-shaped language: a told moment with a when/what-happened spine.
-const SCENE_RE = /\b(the (night|day|morning|afternoon|evening|summer|winter|spring|fall|year|time|moment) (of|when|she|he|we|i|before|after)|one (night|day|time|morning)|that (night|day|morning|time)|when (he|she|we|i|they) \w+|there was (a|this|one)|i remember (the|when|that))\b/i;
+const SCENE_RE = /\b(the (night|day|morning|afternoon|evening|summer|winter|spring|fall|year|time|moment) (of|when|she|he|we|i|before|after)|one (night|day|time|morning)|that (night|day|morning|time)|when (he|she|we|i|they|my|our|his|her|their) \w+|there was (a|this|one)|i remember (the|when|that)|\bonce\b|the time (he|she|they|we|i)|\bshowed up\b|\bdrove \w+ (hours?|miles?|to)\b)/i;
 // Feeling language: the emotional center expressed directly.
 const EMOTION_RE = /\b(feel|feels|felt|feeling|love[ds]?|loving|joy|joyful|smile[ds]?|laugh\w* (made|makes|brought|brings)|warmth|warms?( my)? heart|proud|pride|grateful|gratitude|miss(es|ed)? (him|her|them)|happy|happiness|comfort\w*|peace(ful)?|bittersweet|heart (aches?|swells?|full))\b/i;
 

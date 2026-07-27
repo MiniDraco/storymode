@@ -195,6 +195,21 @@ function catLabel(state, cat) {
   return (state.modeDef && state.modeDef.labels && state.modeDef.labels[cat]) || S.CATEGORIES[cat].label;
 }
 
+// When story material already exists in this territory, a generic ask for the category
+// re-asks it. Force exclusion framing and hand the model the phrases to exclude.
+function gapTargetLine(state, cat) {
+  const base = `TARGET: ${cat} — ${catLabel(state, cat)}. Your question must pursue exactly this and nothing else.`;
+  if (!["specific", "scene", "emotion"].includes(cat)) return base + " Anchor it in a detail from KNOWN when natural.";
+  const territory = S.sortedFactoids(state)
+    .filter((f) => ["specific", "scene", "sacred", "emotion"].includes(f.category) && f.text.split(/\s+/).length >= 3)
+    .slice(0, 3);
+  if (!territory.length) return base + " Anchor it in a detail from KNOWN when natural.";
+  return base +
+    `\nTHEY ALREADY GAVE THIS IN THIS TERRITORY:\n` +
+    territory.map((f) => `- ${f.text}`).join("\n") +
+    `\nYour question MUST begin by naming one of those and asking for something DIFFERENT — start with "Besides …" or "Other than …". A generic ask ("tell me about a time", "what's something special") re-asks what they already gave and is an automatic failure.`;
+}
+
 function buildContext(state, lastAnswer, target) {
   const heat = S.heatFrom(state, state.turn);
   const targetLine =
@@ -202,7 +217,7 @@ function buildContext(state, lastAnswer, target) {
       ? `TARGET: something painful surfaced — "${target.wound.text}". Name it plainly and gently, and ask whether the song should hold it or steer around it. That is the entire question.`
       : target.kind === "heat"
         ? `TARGET: go deeper into this thread from their last answer: "${target.thread.text}". Ask for the ${target.target === "scene" ? "specific moment — what happened" : "feeling inside it"}.`
-        : `TARGET: ${target.target} — ${catLabel(state, target.target)}. Your question must pursue exactly this and nothing else. Anchor it in a detail from KNOWN when natural.`;
+        : gapTargetLine(state, target.target);
   return [
     "KNOWN (never ask about any of this):",
     S.knownDigest(state, 120) || "- nothing yet",
