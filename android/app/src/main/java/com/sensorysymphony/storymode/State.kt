@@ -130,11 +130,13 @@ class StoryState {
             else -> true
         }
         private val SCENE_RE = Regex("\\b(the (night|day|morning|afternoon|evening|summer|winter|spring|fall|year|time|moment) (of|when|she|he|we|i|before|after)|one (night|day|time|morning)|that (night|day|morning|time)|when (he|she|we|i|they) \\w+|there was (a|this|one)|i remember (the|when|that))\\b", RegexOption.IGNORE_CASE)
+        private val EMOTION_RE = Regex("\\b(feel|feels|felt|feeling|love[ds]?|loving|joy|joyful|smile[ds]?|laugh\\w* (made|makes|brought|brings)|warmth|warms?( my)? heart|proud|pride|grateful|gratitude|miss(es|ed)? (him|her|them)|happy|happiness|comfort\\w*|peace(ful)?|bittersweet|heart (aches?|swells?|full))\\b", RegexOption.IGNORE_CASE)
         fun coversGap(cat: String, text: String): Boolean = when (cat) {
             "sound" -> SOUND_RE.containsMatchIn(text)
             "job" -> JOB_RE.containsMatchIn(text)
             "identity" -> IDENTITY_RE.containsMatchIn(text)
             "scene" -> SCENE_RE.containsMatchIn(text)
+            "emotion" -> EMOTION_RE.containsMatchIn(text)
             else -> false
         }
 
@@ -156,7 +158,8 @@ class StoryState {
                         w = w.removeSuffix("'s").replace("'", "")
                         if (!Regex("^[A-Z][a-z]{2,}$").matches(w) || w in NAME_STOP) continue
                         total[w] = (total[w] ?: 0) + 1
-                        if (i > 0 || possessive) strong[w] = (strong[w] ?: 0) + 1
+                        val intro = (words.getOrNull(i + 1)?.matches(Regex("(?i)was|is")) == true) && (words.getOrNull(i + 2)?.matches(Regex("(?i)my")) == true)
+                        if (i > 0 || possessive || intro) strong[w] = (strong[w] ?: 0) + 1
                     }
                 }
             }
@@ -185,7 +188,7 @@ class StoryState {
 
         /** Code-only heal: recategorize plainly-matching factoids into open gaps before target selection. */
         fun syncHeal(state: StoryState) {
-            for (gapKey in listOf("sound", "job", "identity", "scene")) {
+            for (gapKey in listOf("sound", "job", "identity", "scene", "emotion")) {
                 if (gapKey !in state.gaps()) continue
                 val hit = state.factoids.firstOrNull { it.category != gapKey && coversGap(gapKey, "${it.text} ${it.verbatim}") }
                 if (hit != null) state.addFactoid(gapKey, hit.text, hit.verbatim, hit.weight, listOf("recategorized"))

@@ -13,7 +13,7 @@ const YESNO = /^(do|does|did|is|are|was|were|have|has|had|can|could|would|will|s
 
 const META = /\b(comes? to (your )?mind|first (thing|came)|describe them|thought about|tell me about them)\b/i;
 // Generic elicitation forms are re-asks the moment the customer has said anything.
-const GENERIC = /\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them)|stay(ed|s)? with you( the)? most|most represents?|best (shows|describes|captures)|captures who (he|she|they)|you think most)\b/i;
+const GENERIC = /\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them)|stay(ed|s)? with you( the)? most|most represents?|best (shows|describes|captures)|captures who (he|she|they)|you think most|only you (knew|know)|no ?one else (knew|knows|did|does)|nobody else (knew|knows))\b/i;
 // Compound questions smuggle a second ask behind "and".
 const COMPOUND = /\band (why|what|how|when|where|who)\b/i;
 
@@ -60,9 +60,11 @@ function validateQuestion(q, state, kind, lastAnswer) {
     if (S.jaccard(prev, q) >= 0.45) { problems.push("near-duplicate of an asked question"); break; }
   }
   // Revisiting the same moment in new words: any shared 3-gram with a prior question,
-  // computed over stopword-stripped tokens so "the night"/"that night" can't dodge it.
+  // computed over stopword-stripped, pronoun-normalized tokens so neither "the night"/
+  // "that night" nor "call him"/"call them" can dodge it.
   const STOP = new Set(["the", "that", "this", "and", "with", "you", "your", "for", "was", "were", "did", "does"]);
-  const strip = (s) => S.tokens(s).filter((w) => !STOP.has(w));
+  const PRONOUN = new Set(["him", "her", "them", "he", "she", "they", "his", "hers", "their"]);
+  const strip = (s) => S.tokens(s).filter((w) => !STOP.has(w)).map((w) => (PRONOUN.has(w) ? "prn" : w));
   const qt = strip(q);
   outer: for (const prev of state.asked) {
     const pn = " " + strip(prev).join(" ") + " ";
@@ -108,7 +110,7 @@ async function gapAlreadyCovered(model, state, gapKey) {
   // Deterministic pre-pass: if a known factoid plainly matches the gap's pattern
   // (music-ish for sound, occasion-ish for job, relationship words for identity),
   // recategorize it — no model roulette.
-  if (["sound", "job", "identity", "scene"].includes(gapKey)) {
+  if (["sound", "job", "identity", "scene", "emotion"].includes(gapKey)) {
     const hit = state.factoids.find((f) => f.category !== gapKey && S.coversGap(gapKey, f.text + " " + (f.verbatim || "")));
     if (hit) {
       S.addFactoid(state, { category: gapKey, text: hit.text, verbatim: hit.verbatim, weight: hit.weight, flags: ["recategorized"] });
@@ -308,10 +310,12 @@ function fallbackFor(state, cat) {
     // Hammering one gap the extractor keeps missing is worse than an honest THIN flag.
     if ((state.fallbackCounts[cat] || 0) >= 2) return null;
     const anchorCats = cat === "scene" ? ["scene", "specific"] : [cat === "specific" ? "specific" : cat, "specific"];
-    // Names and spellings are not moments — never anchor on them.
+    // Names and spellings are not moments — never anchor on them. And an emotion ask
+    // must not anchor on the answer just given: its feeling was usually just stated.
     const anchors = [...state.factoids]
       .filter((f) => anchorCats.includes(f.category) && f.text.split(/\s+/).length >= 3 && f.text.split(/\s+/).length <= 14)
       .filter((f) => !f.flags.includes("name") && !f.flags.includes("spelling") && !/\bspelled\b|\b(?:[A-Za-z]-){2,}[A-Za-z]\b/i.test(f.text))
+      .filter((f) => !(cat === "emotion" && f.turn === state.turn))
       .sort((a, b) => b.turn - a.turn || b.weight - a.weight);
     for (const a of anchors) {
       if (!anchorUnused(state, short(a.text))) continue;

@@ -5,7 +5,7 @@ object Question {
 
     private val YESNO = Regex("^(do|does|did|is|are|was|were|have|has|had|can|could|would|will|should)\\b", RegexOption.IGNORE_CASE)
     private val META = Regex("\\b(comes? to (your )?mind|first (thing|came)|describe them|thought about|tell me about them)\\b", RegexOption.IGNORE_CASE)
-    private val GENERIC = Regex("\\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them)|stay(ed|s)? with you( the)? most|most represents?|best (shows|describes|captures)|captures who (he|she|they)|you think most)\\b", RegexOption.IGNORE_CASE)
+    private val GENERIC = Regex("\\b(stood out|stands? out|notice(d)? most|remember most|makes? (him|her|them) (so )?special|most about (him|her|them)|stay(ed|s)? with you( the)? most|most represents?|best (shows|describes|captures)|captures who (he|she|they)|you think most|only you (knew|know)|no ?one else (knew|knows|did|does)|nobody else (knew|knows))\\b", RegexOption.IGNORE_CASE)
     private val COMPOUND = Regex("\\band (why|what|how|when|where|who)\\b", RegexOption.IGNORE_CASE)
 
     val FALLBACKS = mapOf(
@@ -56,7 +56,8 @@ object Question {
         // Revisiting the same moment in new words: any shared 3-gram with a prior question,
         // computed over stopword-stripped tokens so "the night"/"that night" can't dodge it.
         val stop = setOf("the", "that", "this", "and", "with", "you", "your", "for", "was", "were", "did", "does")
-        fun strip(s: String) = StoryState.tokens(s).filter { it !in stop }
+        val pronoun = setOf("him", "her", "them", "he", "she", "they", "his", "hers", "their")
+        fun strip(s: String) = StoryState.tokens(s).filter { it !in stop }.map { if (it in pronoun) "prn" else it }
         val qt = strip(q)
         run {
             for (prev in state.asked) {
@@ -97,7 +98,7 @@ object Question {
     private suspend fun gapAlreadyCovered(llm: LlmBridge, state: StoryState, gapKey: String): Boolean {
         // Deterministic pre-pass: a known factoid plainly matching the gap's pattern gets
         // recategorized directly — no model roulette.
-        if (gapKey in listOf("sound", "job", "identity", "scene")) {
+        if (gapKey in listOf("sound", "job", "identity", "scene", "emotion")) {
             val hit = state.factoids.firstOrNull {
                 it.category != gapKey && StoryState.coversGap(gapKey, "${it.text} ${it.verbatim}")
             }
@@ -272,6 +273,7 @@ object Question {
             val anchors = state.factoids
                 .filter { it.category in anchorCats && it.text.split(Regex("\\s+")).size in 3..14 }
                 .filter { "name" !in it.flags && "spelling" !in it.flags && !Regex("\\bspelled\\b|\\b(?:[A-Za-z]-){2,}[A-Za-z]\\b", RegexOption.IGNORE_CASE).containsMatchIn(it.text) }
+                .filter { !(cat == "emotion" && it.turn == state.turn) }
                 .sortedWith(compareByDescending<Factoid> { it.turn }.thenByDescending { it.weight })
             for (a in anchors) {
                 if (!anchorUnused(state, short(a.text))) continue

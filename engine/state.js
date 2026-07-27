@@ -62,12 +62,15 @@ function plausibleCategory(cat, text) {
 }
 // Scene-shaped language: a told moment with a when/what-happened spine.
 const SCENE_RE = /\b(the (night|day|morning|afternoon|evening|summer|winter|spring|fall|year|time|moment) (of|when|she|he|we|i|before|after)|one (night|day|time|morning)|that (night|day|morning|time)|when (he|she|we|i|they) \w+|there was (a|this|one)|i remember (the|when|that))\b/i;
+// Feeling language: the emotional center expressed directly.
+const EMOTION_RE = /\b(feel|feels|felt|feeling|love[ds]?|loving|joy|joyful|smile[ds]?|laugh\w* (made|makes|brought|brings)|warmth|warms?( my)? heart|proud|pride|grateful|gratitude|miss(es|ed)? (him|her|them)|happy|happiness|comfort\w*|peace(ful)?|bittersweet|heart (aches?|swells?|full))\b/i;
 
 function coversGap(cat, text) {
   if (cat === "sound") return SOUND_RE.test(text);
   if (cat === "job") return JOB_RE.test(text);
   if (cat === "identity") return IDENTITY_RE.test(text);
   if (cat === "scene") return SCENE_RE.test(text);
+  if (cat === "emotion") return EMOTION_RE.test(text);
   return false;
 }
 
@@ -168,7 +171,10 @@ function nameCandidate(state) {
         w = w.replace(/'s$/, "").replace(/'/g, "");
         if (!/^[A-Z][a-z]{2,}$/.test(w) || NAME_STOP.has(w)) continue;
         total[w] = (total[w] || 0) + 1;
-        if (i > 0 || possessive) strong[w] = (strong[w] || 0) + 1;
+        // Strong evidence: mid-sentence, possessive, or a name-introduction
+        // ("Danny was my son" / "Karen is my wife").
+        const intro = /^(was|is)$/i.test((words[i + 1] || "")) && /^my$/i.test((words[i + 2] || ""));
+        if (i > 0 || possessive || intro) strong[w] = (strong[w] || 0) + 1;
       }
     }
   }
@@ -204,7 +210,7 @@ function nameCandidatePhrase(state) {
 // Code-only heal pass: recategorize plainly-matching factoids into open gaps.
 // Runs before target selection so the heat branch never hunts an already-told scene.
 function syncHeal(state) {
-  for (const gapKey of ["sound", "job", "identity", "scene"]) {
+  for (const gapKey of ["sound", "job", "identity", "scene", "emotion"]) {
     if (!gaps(state).includes(gapKey)) continue;
     const hit = state.factoids.find((f) => f.category !== gapKey && coversGap(gapKey, f.text + " " + (f.verbatim || "")));
     if (hit) addFactoid(state, { category: gapKey, text: hit.text, verbatim: hit.verbatim, weight: hit.weight, flags: ["recategorized"] });
